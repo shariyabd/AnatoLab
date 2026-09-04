@@ -11,6 +11,7 @@
 /storage/framework/cache/*
 /storage/framework/sessions/*
 /storage/framework/views/*
+/storage/framework/testing/*
 /storage/logs/*
 /bootstrap/cache/*
 .env
@@ -18,6 +19,17 @@
 !.env.example
 .phpunit.result.cache
 /.php-cs-fixer.cache
+
+# Local SQLite database (development fallback when MySQL is unavailable)
+/database/*.sqlite
+/database/*.sqlite-journal
+
+# Test and analysis caches
+/.phpunit.cache
+/.phpstan.cache
+/test-results
+/playwright-report
+/tests/Browser/.auth
 
 # 3D assets — large binaries, managed by Handover 02
 /public/models/*.glb
