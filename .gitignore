@@ -1,0 +1,31 @@
+# Local Claude Code overrides (machine-specific, not team config)
+.claude/settings.local.json
+
+# Laravel (from Handover 01 onward)
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+/bootstrap/cache/*
+.env
+.env.*
+!.env.example
+.phpunit.result.cache
+/.php-cs-fixer.cache
+
+# 3D assets — large binaries, managed by Handover 02
+/public/models/*.glb
+/public/models/*.gltf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
