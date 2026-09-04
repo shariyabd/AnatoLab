@@ -1,0 +1,19 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+
+    paths:
+        - app
+        - config
+        - database
+        - routes
+
+    # tests/ is deliberately excluded. Pest binds $this in test closures at
+    # runtime; no static analyser can see that, and there is no Pest extension
+    # for PHPStan. Analysing tests here produces ~60 false "undefined method"
+    # errors that would train everyone to ignore the output. Test correctness is
+    # guarded by the tests running, not by analysing them.
+    #
+    # If tests ever move to class-based PHPUnit, add the directory back.

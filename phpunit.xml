@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         beStrictAboutOutputDuringTests="true"
+         failOnRisky="true"
+         failOnWarning="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+
+        <!--
+          A fixed, published, test-only key. Not a secret: it exists so the
+          suite runs on a machine with no .env at all, which is what makes CI
+          and a fresh clone work without setup. Never reuse it anywhere else.
+        -->
+        <env name="APP_KEY" value="base64:kXQ0dQCXVQCyH7fEPRLbUwoIeQIVLZbFjHaJPqLbFYo="/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="APP_DEBUG" value="true"/>
+
+        <!--
+          In-memory SQLite: the suite must never touch a developer's real
+          database, and an on-disk file leaks state between runs.
+        -->
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+
+        <env name="CACHE_STORE" value="array"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="MAIL_MAILER" value="array"/>
+
+        <!--
+          Never a real provider. A test that makes a network call gets deleted
+          (docs/engineering.md section 9); pinning it here means a test cannot
+          reach one even by accident.
+        -->
+        <env name="AI_PROVIDER" value="null"/>
+        <env name="VECTOR_STORE" value="null"/>
+
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+    </php>
+</phpunit>
