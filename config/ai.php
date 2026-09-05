@@ -113,6 +113,62 @@ return [
         'requests_per_day' => (int) env('AI_REQUESTS_PER_DAY', 200),
         'max_response_words' => 220,
         'max_context_chunks' => 5,
+
+        /*
+        | Added by Handover 08. The generic `requests_per_minute` above stays as
+        | the shared `ai` limiter for Handovers 11 and 12; the tutor endpoints
+        | need their own numbers because docs/architecture.md §8.4 specifies
+        | them per endpoint — 20/min and 200/day for ask and explain, 30/min for
+        | hints, which are cheaper and asked in bursts while a student is stuck.
+        */
+        'tutor_per_minute' => (int) env('AI_TUTOR_PER_MINUTE', 20),
+        'tutor_per_day' => (int) env('AI_TUTOR_PER_DAY', 200),
+        'hint_per_minute' => (int) env('AI_HINT_PER_MINUTE', 30),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Transport
+    |---------------------------------------------------------------------------
+    |
+    | Added by Handover 08. docs/architecture.md §8.4: a 20-second provider
+    | timeout, one retry, then a graceful message. One retry rather than three
+    | because a student is waiting: a second failure is a real outage, and three
+    | attempts turn a 20-second wait into a minute of a spinner.
+    |
+    */
+
+    'transport' => [
+        'timeout_seconds' => (int) env('AI_TIMEOUT_SECONDS', 20),
+        'retries' => (int) env('AI_RETRIES', 1),
+        'retry_delay_ms' => (int) env('AI_RETRY_DELAY_MS', 400),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Tutor
+    |---------------------------------------------------------------------------
+    |
+    | Added by Handover 08.
+    |
+    */
+
+    'tutor' => [
+        /*
+        | How many previous turns are replayed to the provider. Enough for a
+        | follow-up question to make sense, short enough that a long thread does
+        | not silently grow every prompt until it is mostly history.
+        */
+        'history_turns' => (int) env('AI_TUTOR_HISTORY_TURNS', 6),
+
+        'max_tokens' => (int) env('AI_TUTOR_MAX_TOKENS', 700),
+
+        /*
+        | Low, not zero. Tutoring benefits from some variation in phrasing when
+        | a student asks the same thing twice; zero makes the second explanation
+        | identical to the first one they did not understand.
+        */
+        'temperature' => (float) env('AI_TUTOR_TEMPERATURE', 0.3),
     ],
 
 ];
