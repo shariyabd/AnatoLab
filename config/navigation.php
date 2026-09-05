@@ -47,7 +47,16 @@ return [
             'order' => 20,
         ],
 
-        // F06 → lessons · F07 → quizzes · F09 → missions · F10 → progress · F12 → simulations
+        [
+            'key' => 'lessons',
+            'label' => 'Lessons',
+            'route' => 'lessons.index',
+            'icon' => 'book',
+            'roles' => ['student', 'admin'],
+            'order' => 30,
+        ],
+
+        // F07 → quizzes · F09 → missions · F10 → progress · F12 → simulations
 
     ],
 
