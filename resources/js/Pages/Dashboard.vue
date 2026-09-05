@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Head, usePage } from '@inertiajs/vue3'
+import FirstRun from '@/Components/Onboarding/FirstRun.vue'
 import AchievementList from '@/Components/Progress/AchievementList.vue'
 import ActivityFeed from '@/Components/Progress/ActivityFeed.vue'
 import LevelBadge from '@/Components/Progress/LevelBadge.vue'
@@ -47,7 +48,14 @@ const isFirstRun = computed(
   <Head title="Dashboard" />
 
   <div class="space-y-8">
+    <FirstRun v-if="isFirstRun" :name="user?.name ?? 'and welcome'" />
+
     <header>
+      <!--
+        "Welcome back" is wrong on the visit where FirstRun is showing — the
+        student has not been anywhere yet, and the panel above has already
+        greeted them.
+      -->
       <h1 class="text-2xl font-semibold tracking-tight">
         <template v-if="isFirstRun">Your progress</template>
         <template v-else>Welcome back{{ user ? `, ${user.name}` : '' }}</template>

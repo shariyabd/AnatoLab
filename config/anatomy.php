@@ -53,6 +53,14 @@ return [
     'budgets' => [
         'max_model_bytes' => 2 * 1024 * 1024,
         'max_triangles' => 150_000,
+
+        /*
+        | Initial page JavaScript, gzipped, EXCLUDING the Three.js chunk —
+        | which is loaded on demand by the pages that show a viewer and is
+        | budgeted as a per-organ cost, not as a cost every page pays.
+        | Added by Handover 14 and enforced by scripts/verify-bundle.mjs.
+        */
+        'max_initial_js_gzip_bytes' => 200 * 1024,
     ],
 
 ];
