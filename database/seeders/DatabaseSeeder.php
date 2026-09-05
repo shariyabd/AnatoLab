@@ -31,7 +31,7 @@ final class DatabaseSeeder extends Seeder
             AnatomySeeder::class,
             LessonSeeder::class,
             AssessmentSeeder::class,
-            // F09 → MissionSeeder
+            MissionSeeder::class,
             // F10 → AchievementSeeder
             // F11 → KnowledgeSeeder
             // F12 → SimulationSeeder

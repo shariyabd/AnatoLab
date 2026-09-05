@@ -65,7 +65,16 @@ return [
             'order' => 40,
         ],
 
-        // F09 → missions · F10 → progress · F12 → simulations
+        [
+            'key' => 'missions',
+            'label' => 'Missions',
+            'route' => 'missions.index',
+            'icon' => 'route',
+            'roles' => ['student', 'admin'],
+            'order' => 50,
+        ],
+
+        // F10 → progress · F12 → simulations
 
     ],
 
