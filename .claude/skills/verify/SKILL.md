@@ -15,23 +15,29 @@ Run in this order. Do not stop at the first failure — collect all results, so 
 report gives the full picture.
 
 ```bash
-# 1. Format (mutates files; run first so later steps see formatted code)
+# 1. Formatting — check, do not mutate. A verify run that rewrites files makes
+#    the diff you are about to review different from the one you tested.
 [ -x vendor/bin/pint ] && vendor/bin/pint --test
+[ -d node_modules ] && npm run format:check
 
 # 2. Static analysis
 [ -x vendor/bin/phpstan ] && vendor/bin/phpstan analyse --no-progress
+[ -d node_modules ] && npm run typecheck
 
 # 3. PHP tests
 [ -x vendor/bin/pest ] && vendor/bin/pest --compact
 
 # 4. Schema builds from scratch (catches migrations that only work incrementally)
-[ -f artisan ] && php artisan migrate:fresh --env=testing --force
+#    --seed as well: a seeder that broke is a broken demo, and the demo is a
+#    first-class artefact (docs/engineering.md §6).
+[ -f artisan ] && php artisan migrate:fresh --seed --force
 
-# 5. Routes resolve (catches a controller or method that does not exist)
+# 5. Routes resolve (catches a controller or method that does not exist, and a
+#    duplicate route name where the later registration silently wins)
 [ -f artisan ] && php artisan route:list > /dev/null
 
 # 6. Frontend
-[ -d node_modules ] && npm run test --if-present && npm run build
+[ -d node_modules ] && npm run test && npm run build
 
 # 7. Architecture boundaries across the whole repo
 /boundary-audit
@@ -49,11 +55,14 @@ explicitly in the report.
 VERIFICATION — <branch> @ <short sha>
 
   Pint          PASS | FAIL | SKIPPED (not installed)
+  Prettier      …
   PHPStan       …
+  vue-tsc       …
   Pest          … (N passed, M failed)
   migrate:fresh …
   route:list    …
-  Frontend      …
+  Vitest        …
+  Build         …
   Boundaries    …
   Secret scan   …
 
@@ -68,3 +77,17 @@ RESULT: PASS / FAIL
 - If a test is failing for a reason unrelated to the current change, say that
   explicitly and name the test — do not silently exclude it.
 - Do not "fix" a failure by deleting, skipping, or loosening the assertion.
+
+## Environment prerequisites
+
+Steps 3-5 need a `.env` (Laravel reads `APP_KEY` and the database connection from
+it). On a fresh clone:
+
+```bash
+cp .env.example .env && php artisan key:generate
+```
+
+Without it, Pest still runs — `phpunit.xml` supplies its own environment — but every
+test emits a "failed to open .env" warning, and `migrate:fresh` falls back to
+`database/database.sqlite` rather than the connection you think you are testing.
+Report that as **SKIPPED (no .env)**, never as a pass.

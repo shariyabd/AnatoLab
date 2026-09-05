@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: PHP
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        # Matches docs/architecture.md §2. The suite itself runs on in-memory
+        # SQLite (phpunit.xml); this service exists so the migrate:fresh step
+        # proves the schema builds on the database we actually deploy to.
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: anatolab
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, redis, intl, zip
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Check formatting
+        run: vendor/bin/pint --test
+
+      - name: Static analysis
+        run: vendor/bin/phpstan analyse --no-progress
+
+      - name: Tests
+        run: vendor/bin/pest --compact
+
+      - name: Schema builds from empty on MySQL
+        # Catches a migration that only works incrementally, and anything that
+        # is accidentally SQLite-only (docs/engineering.md §6).
+        run: php artisan migrate:fresh --seed --force
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: anatolab
+          DB_USERNAME: root
+          DB_PASSWORD: ''
+
+      - name: Routes resolve
+        run: php artisan route:list > /dev/null
+
+      - name: Known vulnerabilities in dependencies
+        # Advisory, not blocking: Laravel 11 currently carries unpatched
+        # advisories with no 11.x fix available. See README "Known issues".
+        run: composer audit || true
+
+  frontend:
+    name: JavaScript
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: No secret reached the client bundle
+        # docs/engineering.md §10: a provider key in a VITE_* variable would be
+        # served to every visitor. Fail loudly rather than at disclosure time.
+        run: |
+          if grep -rEl '(sk-ant-|sk-[A-Za-z0-9]{32}|AKIA[0-9A-Z]{16})' public/build; then
+            echo "::error::A credential-shaped string is present in the built bundle."
+            exit 1
+          fi
+          echo "Clean."
+
+  boundaries:
+    name: Architecture boundaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Invariants that a per-file hook cannot see
+        # Mirrors .claude/skills/boundary-audit. The hook checks one file as it
+        # is written; this checks code that arrived by merge or was written with
+        # hooks disabled (docs/engineering.md §1).
+        run: |
+          fail=0
+
+          check() {
+            local label="$1"; shift
+            local hits
+            hits=$("$@" 2>/dev/null || true)
+            if [ -n "$hits" ]; then
+              echo "::error::$label"
+              echo "$hits"
+              fail=1
+            fi
+          }
+
+          check "Services must take typed arguments, not read request()/auth()/session()" \
+            grep -rnE '\brequest\(|\bauth\(|\bsession\(' app/Services
+
+          check "Services must depend on App\\Contracts, never App\\Infrastructure" \
+            grep -rn 'App\\Infrastructure' app/Services
+
+          check "Models must not depend on Services or Http" \
+            grep -rnE 'App\\(Services|Http)' app/Models
+
+          check "Eloquent only in app/ — no raw SQL" \
+            grep -rnE 'DB::(raw|table|select|statement|insert|update|delete)' app
+
+          check "The viewer must not import Vue, Inertia, or a HTTP client" \
+            grep -rnE "from ['\"]vue['\"]|@inertiajs|from ['\"]axios['\"]|\bfetch\(" resources/js/anatomy
+
+          check "No answer key may reach the client" \
+            grep -rnE 'is_correct|correct_structure_id|correct_option_id|correct_sequence' resources/js
+
+          check "Every PHP file needs declare(strict_types=1)" \
+            sh -c "find app database tests -name '*.php' | xargs -r grep -LE 'declare\(strict_types=1\)'"
+
+          # Only ASSIGNMENTS, not prose or imports. The boundary-audit skill
+          # greps loosely on purpose (a human judges each hit); CI must not
+          # fail on a doc comment that happens to say FIT_SIZE.
+          check "FIT_SIZE must be assigned 3.8 everywhere" \
+            sh -c "grep -rnE \"(FIT_SIZE|'fit_size')[[:space:]]*(=>|=)[[:space:]]*[0-9]\" app config resources/js | grep -v '3\.8' || true"
+
+          exit $fail
