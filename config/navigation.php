@@ -74,7 +74,20 @@ return [
             'order' => 50,
         ],
 
-        // F10 → progress · F12 → simulations
+        [
+            'key' => 'simulations',
+            'label' => 'Simulations',
+            'route' => 'simulations.index',
+            'icon' => 'activity',
+            'roles' => ['student', 'admin'],
+            // 70, not 60: Handover 10 is building progress in parallel and was
+            // allocated 60 by the comment this entry replaces
+            // (docs/handovers/parallel-execution-plan.md §3 C4). Appending past
+            // it keeps the merge a two-line conflict at worst.
+            'order' => 70,
+        ],
+
+        // F10 → progress
 
     ],
 
