@@ -1,11 +1,695 @@
 {
   "version": 1,
   "status": "pending-licence",
-  "generatedAt": null,
+  "generatedAt": "2026-09-05T15:17:10.561Z",
   "fitSize": 3.8,
   "budgets": {
     "maxModelBytes": 2097152,
     "maxTriangles": 150000
   },
-  "models": []
+  "models": [
+    {
+      "organSlug": "brain",
+      "registerId": "MDL-01",
+      "fileName": "brain.glb",
+      "modelPath": "models/brain.glb",
+      "modelFormat": "glb",
+      "bytes": 1484584,
+      "sha256": "71d073fdbe398f3995d38426b781fc5e08fc728526c8f65334848df62f125d80",
+      "triangles": 147000,
+      "vertices": 86472,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 3,
+        "bytes": 545464,
+        "maxDimension": 2048,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.9,
+          -1.7452955717642749,
+          -1.565773491622669
+        ],
+        "max": [
+          1.9,
+          1.7452955717642749,
+          1.565773491622669
+        ],
+        "size": [
+          3.8,
+          3.4905911435285497,
+          3.131546983245338
+        ],
+        "centre": [
+          0,
+          0,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 0,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "brain.glb",
+        "bytes": 2570592,
+        "triangles": 377692,
+        "textureCodecs": [
+          "image/webp"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:16:50.179Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 2048,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "eyeball",
+      "registerId": "MDL-02",
+      "fileName": "eyeball.glb",
+      "modelPath": "models/eyeball.glb",
+      "modelFormat": "glb",
+      "bytes": 1444532,
+      "sha256": "9b521ba16af73ff18f4651e1b1f841d610b1f33cc58a6589207714cbaec317d2",
+      "triangles": 147000,
+      "vertices": 88887,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 3,
+        "bytes": 524220,
+        "maxDimension": 2048,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.9,
+          -1.5611346781823177,
+          -1.6548387096774193
+        ],
+        "max": [
+          1.9,
+          1.5611346781823172,
+          1.6548387096774193
+        ],
+        "size": [
+          3.8,
+          3.122269356364635,
+          3.3096774193548386
+        ],
+        "centre": [
+          0,
+          -2.220446049250313e-16,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 2.220446049250313e-16,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "eyeball.glb",
+        "bytes": 2203616,
+        "triangles": 320250,
+        "textureCodecs": [
+          "image/webp"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:16:53.288Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 2048,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "heart",
+      "registerId": "MDL-03",
+      "fileName": "heart.glb",
+      "modelPath": "models/heart.glb",
+      "modelFormat": "glb",
+      "bytes": 1471260,
+      "sha256": "ad46005ef4e868485a9ec65b40ac1ac960580ee92f9e2a9435a97ca054375790",
+      "triangles": 147000,
+      "vertices": 90131,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 3,
+        "bytes": 512406,
+        "maxDimension": 2048,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.1563402203436384,
+          -1.9,
+          -1.132914212469863
+        ],
+        "max": [
+          1.1563402203436384,
+          1.9,
+          1.132914212469863
+        ],
+        "size": [
+          2.3126804406872767,
+          3.8,
+          2.265828424939726
+        ],
+        "centre": [
+          0,
+          0,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 0,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "heart.glb",
+        "bytes": 3321148,
+        "triangles": 386597,
+        "textureCodecs": [
+          "image/webp"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:16:36.902Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 2048,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "intestine",
+      "registerId": "MDL-04",
+      "fileName": "intestine.glb",
+      "modelPath": "models/intestine.glb",
+      "modelFormat": "glb",
+      "bytes": 1181156,
+      "sha256": "66e0b05a8a2a3e6e2547ad0c159426729c07086d93788bef3005868b31d668f4",
+      "triangles": 146990,
+      "vertices": 91402,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 1,
+        "bytes": 206970,
+        "maxDimension": 2048,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.6833674123355815,
+          -1.9,
+          -0.811154515213477
+        ],
+        "max": [
+          1.6833674123355815,
+          1.9,
+          0.811154515213477
+        ],
+        "size": [
+          3.366734824671163,
+          3.8,
+          1.622309030426954
+        ],
+        "centre": [
+          0,
+          0,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 0,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "intestine.glb",
+        "bytes": 1980780,
+        "triangles": 308748,
+        "textureCodecs": [
+          "image/webp"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:16:55.959Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 2048,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "kidneys",
+      "registerId": "MDL-05",
+      "fileName": "kidneys.glb",
+      "modelPath": "models/kidneys.glb",
+      "modelFormat": "glb",
+      "bytes": 1394636,
+      "sha256": "27b654b86a161db5785056fdd313655a783a7d90348b71d6d184e027711f57c5",
+      "triangles": 147000,
+      "vertices": 89234,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 3,
+        "bytes": 488236,
+        "maxDimension": 2048,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.9,
+          -1.3963988158818321,
+          -0.7213934751426739
+        ],
+        "max": [
+          1.9,
+          1.3963988158818326,
+          0.7213934751426739
+        ],
+        "size": [
+          3.8,
+          2.7927976317636647,
+          1.4427869502853479
+        ],
+        "centre": [
+          0,
+          2.220446049250313e-16,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 2.220446049250313e-16,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "kidneys.glb",
+        "bytes": 2190764,
+        "triangles": 327452,
+        "textureCodecs": [
+          "image/webp"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:16:58.791Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 2048,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "liver",
+      "registerId": "MDL-06",
+      "fileName": "liver.glb",
+      "modelPath": "models/liver.glb",
+      "modelFormat": "glb",
+      "bytes": 1619236,
+      "sha256": "edea414c1311e85caca46ec66e15010937e46310584f23c2404966a95c31b54e",
+      "triangles": 146998,
+      "vertices": 104406,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 1,
+        "bytes": 518334,
+        "maxDimension": 2048,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.8874752037110507,
+          -1.9,
+          -0.9733390301217688
+        ],
+        "max": [
+          1.8874752037110507,
+          1.9,
+          0.9733390301217688
+        ],
+        "size": [
+          3.7749504074221014,
+          3.8,
+          1.9466780602435376
+        ],
+        "centre": [
+          0,
+          0,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 0,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "liver.glb",
+        "bytes": 2660384,
+        "triangles": 345526,
+        "textureCodecs": [
+          "image/webp"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:17:01.697Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 2048,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "lungs",
+      "registerId": "MDL-07",
+      "fileName": "lungs.glb",
+      "modelPath": "models/lungs.glb",
+      "modelFormat": "glb",
+      "bytes": 1977832,
+      "sha256": "3afec22ab7faa3b2fd1809a136b52ad8afe3dbe9233d140ad52d3b09838501fc",
+      "triangles": 146994,
+      "vertices": 86927,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 3,
+        "bytes": 1076176,
+        "maxDimension": 2048,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.7510940885647146,
+          -1.9,
+          -1.1895077364421522
+        ],
+        "max": [
+          1.7510940885647146,
+          1.9000000000000004,
+          1.1895077364421522
+        ],
+        "size": [
+          3.502188177129429,
+          3.8000000000000003,
+          2.3790154728843045
+        ],
+        "centre": [
+          0,
+          2.220446049250313e-16,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8000000000000003,
+        "maxCentreOffset": 2.220446049250313e-16,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "lungs.glb",
+        "bytes": 4455976,
+        "triangles": 350772,
+        "textureCodecs": [
+          "image/jpeg"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:17:04.869Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 2048,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "pancreas",
+      "registerId": "MDL-08",
+      "fileName": "pancreas.glb",
+      "modelPath": "models/pancreas.glb",
+      "modelFormat": "glb",
+      "bytes": 1370720,
+      "sha256": "32822b163ef45eea24e09b66cda49f48f8e0b744e4bd454f41a1fdcf43dd31cf",
+      "triangles": 147000,
+      "vertices": 83929,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 3,
+        "bytes": 468932,
+        "maxDimension": 1024,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.9,
+          -1.0120731223487043,
+          -0.7005188146610919
+        ],
+        "max": [
+          1.9,
+          1.0120731223487043,
+          0.7005188146610919
+        ],
+        "size": [
+          3.8,
+          2.0241462446974086,
+          1.4010376293221838
+        ],
+        "centre": [
+          0,
+          0,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 0,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "pancreas.glb",
+        "bytes": 4848556,
+        "triangles": 346596,
+        "textureCodecs": [
+          "image/jpeg"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:17:07.585Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 1024,
+        "simplifyError": 0.0005
+      }
+    },
+    {
+      "organSlug": "skin",
+      "registerId": "MDL-09",
+      "fileName": "skin.glb",
+      "modelPath": "models/skin.glb",
+      "modelFormat": "glb",
+      "bytes": 1639124,
+      "sha256": "23ed12b18006bc720807134f1d0f93ae2114784c97ce49fff7a7873a67a53896",
+      "triangles": 146995,
+      "vertices": 105263,
+      "meshes": 1,
+      "materials": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_volume",
+        "KHR_mesh_quantization"
+      ],
+      "textures": {
+        "count": 3,
+        "bytes": 515042,
+        "maxDimension": 1024,
+        "codecs": [
+          "image/webp"
+        ]
+      },
+      "boundingBox": {
+        "min": [
+          -1.9,
+          -1.4996704000976593,
+          -1.6543748283333841
+        ],
+        "max": [
+          1.9,
+          1.4996704000976588,
+          1.6543748283333841
+        ],
+        "size": [
+          3.8,
+          2.999340800195318,
+          3.3087496566667682
+        ],
+        "centre": [
+          0,
+          -2.220446049250313e-16,
+          0
+        ]
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 2.220446049250313e-16,
+        "tolerance": 0.0076,
+        "ok": true
+      },
+      "budget": {
+        "bytesOk": true,
+        "trianglesOk": true,
+        "ok": true
+      },
+      "source": {
+        "fileName": "skin.glb",
+        "bytes": 5789160,
+        "triangles": 356333,
+        "textureCodecs": [
+          "image/jpeg"
+        ]
+      },
+      "encodedAt": "2026-09-05T15:17:10.560Z",
+      "encoder": {
+        "pipeline": "scripts/encode-model.mjs@1.0.0",
+        "textures": "webp",
+        "textureSize": 1024,
+        "simplifyError": 0.001
+      }
+    }
+  ]
 }

@@ -36,7 +36,7 @@ it('reports the release gate from the manifest, not from prose', function (): vo
     $this->get('/attribution')->assertInertia(
         fn (AssertableInertia $page) => $page
             ->where('register.assetsCleared', false)
-            ->where('register.modelCount', 0)
+            ->where('register.modelCount', 9)
     );
 });
 
