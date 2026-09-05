@@ -15,4 +15,9 @@ return [
     // VectorStoreInterface over the platform's baseline NullVectorStore without
     // disturbing the AIProviderInterface binding above it.
     App\Providers\RagServiceProvider::class,
+
+    // Handover 10. Binds nothing; it attaches the analytics observers to two
+    // other lanes' models and registers the events endpoint's rate limiter, so
+    // its position in this list does not matter.
+    App\Providers\ProgressServiceProvider::class,
 ];
