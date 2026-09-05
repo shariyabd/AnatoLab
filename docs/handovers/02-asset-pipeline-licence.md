@@ -3,6 +3,7 @@
 **Feature:** F02 · **Lane:** Content/Platform · **Wave:** 1 (parallel with 01) · **Branch:** `feat/f02-asset-pipeline`
 
 > Read first: `docs/project-context.md` §2.2, §2.6, §3 — the audit that produced this work.
+> **This handover has been amended.** See Amendment A at the end before acting on §1.
 
 ## Objective
 
@@ -51,9 +52,12 @@ is all-rights-reserved by default; 3,158 stars and 837 forks grant nothing.
   request date and any response.
 - **Do not block on the answer.** In parallel, evaluate the replacement candidates:
   **BodyParts3D / Anatomography** (CC BY-SA 2.1 JP), **Z-Anatomy** (CC BY-SA, Blender source),
-  **NIH 3D Print Exchange** (mostly public domain / CC0).
-- All three ship **per-structure meshes**, which would also resolve the single-mesh
-  limitation in `docs/project-context.md` §2.2. Treat that as an upside, not a cost.
+  **NIH 3D** (per-entry licensing chosen by each contributor — **not** blanket public domain;
+  see Amendment A).
+- BodyParts3D and Z-Anatomy ship **per-structure meshes**, which would also resolve the
+  single-mesh limitation in `docs/project-context.md` §2.2. Treat that as an upside, not a
+  cost. NIH 3D is mixed: its GLB entries carry named sub-parts, its STL entries do not — see
+  Amendment A's selection rules.
 
 **Escalate the moment a "no" or a two-week silence looks likely.** The fallback is weeks of
 work and must not be discovered in Wave 5.
@@ -127,3 +131,72 @@ that the asset set may be deployed publicly.
 `docs(assets): licence register and audit trail`, `feat(assets): model encoding pipeline`,
 `chore(assets): encoded model set + manifest`. The licence decision lands as its own commit
 so it is easy to find later.
+
+---
+
+## Amendment A — NIH 3D source correction
+
+**Date:** 2026-09-05 · **Applies to:** §1 and §2 · **Status:** binding
+
+### Correction
+
+The original §1 described NIH 3D as "mostly public domain / CC0." **That was inaccurate.**
+
+Per NIH 3D's Terms and Conditions §4.3, licensing is chosen and applied per entry by the
+uploading user. NIH does not enforce licence terms on contributors' behalf. Entries range
+from public domain through CC-BY to more restrictive terms. Verified example: entry
+3DPX-000906 (Heart, Aorta and Kidney CAD Model) is **CC-BY**, requiring attribution.
+
+There is no blanket grant. **Every NIH 3D file requires an individual licence check.**
+
+### Source tiering — this is the decision, record it
+
+**Primary: Z-Anatomy.** One consistent full-body source, per-structure meshes, Latin/TA
+naming already applied, Blender source, CC BY-SA. It is the only candidate that solves mesh
+identity, structure naming, and coverage in a single move.
+
+**Secondary: BodyParts3D / Anatomography** (CC BY-SA 2.1 JP) — for organs Z-Anatomy renders
+poorly or omits.
+
+**Tertiary: NIH 3D** — for specific gaps only. Strongest for CT-derived skeletal models,
+which is precisely where Z-Anatomy is weakest and where F16's musculoskeletal budget problem
+sits.
+
+**Do not mix sources within a single organ.** Scale, topology, and visual style differ enough
+across sources that the product will look assembled rather than made.
+
+### NIH 3D selection rules — apply to every candidate before download
+
+1. **Prefer GLB entries over STL.** STL carries no materials, no textures, and no named
+   parts. An STL import reproduces exactly the single-mesh limitation that F17 exists to
+   remove. If only STL exists for a needed organ, it does not qualify — source it elsewhere.
+2. **Reject patient-specific and pathological specimens.** Much of NIH 3D is segmented from
+   individual patient MRI/CT, and the cardiac collection skews heavily toward congenital
+   disease. This product teaches normal anatomy to ages 13–18. One patient's diseased heart
+   is the wrong specimen regardless of mesh quality.
+3. **Record the entry ID, its stated licence, and its required attribution string** in
+   `docs/asset-register.md` *before* download, not after. One row per file, no exceptions.
+4. **Skip the molecular library entirely.** AlphaFold, PDB, and EMDB entries are proteins,
+   not organs. Out of scope.
+
+### Skeletal exception
+
+F16 flags the musculoskeletal system as the one system that cannot make the 2 MB / 150k
+triangle budget. NIH 3D's CT-derived bone models are the strongest candidates for regional
+skeletal assets (skull, thorax, hand, spine). Evaluate them specifically for that purpose,
+under the same per-entry licence check as everything else.
+
+### Deliverable
+
+`docs/asset-sources.md`, recording: the tiering above, the date, the rationale, and — for
+every source adopted — its licence, its attribution string, and whether share-alike attaches.
+F14's attribution page renders from this file.
+
+### Constraint
+
+**Do not download a single file before `docs/asset-sources.md` exists and is committed.**
+The register is the gate, not the paperwork afterward.
+
+### Amendment commit
+
+`docs(assets): amend F02 — correct NIH 3D licensing claim`
