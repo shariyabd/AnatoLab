@@ -56,7 +56,16 @@ return [
             'order' => 30,
         ],
 
-        // F07 → quizzes · F09 → missions · F10 → progress · F12 → simulations
+        [
+            'key' => 'quizzes',
+            'label' => 'Quizzes',
+            'route' => 'quiz.index',
+            'icon' => 'target',
+            'roles' => ['student', 'admin'],
+            'order' => 40,
+        ],
+
+        // F09 → missions · F10 → progress · F12 → simulations
 
     ],
 
