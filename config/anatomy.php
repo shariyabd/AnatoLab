@@ -31,12 +31,17 @@ return [
     | Model storage
     |---------------------------------------------------------------------------
     |
-    | Where organ models are served from. Local disk in development, an
-    | S3-compatible bucket in production (docs/architecture.md §2).
+    | Where organ models are served from. The `models` disk is the web root,
+    | which is where scripts/encode-model.mjs writes and what `modelPath` in
+    | public/models/manifest.json is relative to. Production points this at an
+    | S3-compatible bucket instead (docs/architecture.md §2).
+    |
+    | Not the `public` disk: that is storage/app/public behind the storage
+    | symlink, a different directory that the pipeline never writes to.
     |
     */
 
-    'model_disk' => env('ANATOMY_MODEL_DISK', 'public'),
+    'model_disk' => env('ANATOMY_MODEL_DISK', 'models'),
 
     'model_path' => 'models',
 

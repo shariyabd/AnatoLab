@@ -20,7 +20,12 @@ use Illuminate\Support\Facades\Storage;
 
 beforeEach(function (): void {
     Cache::flush();
-    Storage::fake('public');
+
+    // The disk the resolver actually reads, not a hard-coded 'public'. Models
+    // are served from the web root (config/filesystems.php `models`), which is
+    // a different directory from storage/app/public; faking the wrong one makes
+    // the fingerprint read an empty disk and every anchor look unverified.
+    Storage::fake((string) config('anatomy.model_disk'));
 
     $this->admin = User::factory()->admin()->create();
     $this->organ = Organ::factory()->published()->create(['model_path' => 'models/heart.glb']);
@@ -102,7 +107,7 @@ it('rejects an anchor that is not exactly three numbers', function (): void {
 });
 
 it('records which model version an anchor was authored against', function (): void {
-    Storage::disk('public')->put('models/heart.glb', 'glb-bytes-v1');
+    Storage::disk((string) config('anatomy.model_disk'))->put('models/heart.glb', 'glb-bytes-v1');
 
     $this->actingAs($this->admin)
         ->post("/admin/organs/{$this->organ->slug}/structures", [
@@ -124,7 +129,7 @@ it('records which model version an anchor was authored against', function (): vo
 it('warns when the model has changed since the anchor was authored', function (): void {
     $anatomy = app(AnatomyService::class);
 
-    Storage::disk('public')->put('models/heart.glb', 'glb-bytes-v1');
+    Storage::disk((string) config('anatomy.model_disk'))->put('models/heart.glb', 'glb-bytes-v1');
 
     $structure = AnatomicalStructure::factory()->for($this->organ)->create();
     $anatomy->setAnchorPosition($structure, [0.5, 0.5, 0.5]);
@@ -133,7 +138,7 @@ it('warns when the model has changed since the anchor was authored', function ()
 
     // Re-encode the model. Every anchor authored against the old file may now
     // point at the wrong anatomy, and only the fingerprint says so.
-    Storage::disk('public')->put('models/heart.glb', 'glb-bytes-v2-reencoded-and-longer');
+    Storage::disk((string) config('anatomy.model_disk'))->put('models/heart.glb', 'glb-bytes-v2-reencoded-and-longer');
 
     expect($anatomy->anchorMatchesCurrentModel($structure->refresh()))->toBeFalse();
 });

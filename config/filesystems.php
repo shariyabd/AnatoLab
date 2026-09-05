@@ -40,6 +40,30 @@ return [
             'report' => false,
         ],
 
+        /*
+        | Organ models, served straight out of the web root.
+        |
+        | A disk of its own rather than the `public` disk, because the two mean
+        | different directories: `public` is storage/app/public reached through
+        | the storage symlink, while scripts/encode-model.mjs writes to
+        | public/models and records `modelPath` relative to public/
+        | (scripts/README.md). Pointing the resolver at the wrong one yields a
+        | /storage/models/... URL for a file that lives at /models/..., which
+        | fails as a download rather than as a 404.
+        |
+        | `url` is relative on purpose: the models are same-origin, so the URL
+        | must not carry APP_URL's host and port. Moving them to a bucket is
+        | still a config change and no client work — swap this to the s3 driver
+        | with an absolute `url` (docs/architecture.md §2).
+        */
+        'models' => [
+            'driver' => 'local',
+            'root' => public_path(),
+            'url' => '',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
