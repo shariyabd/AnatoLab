@@ -8,10 +8,15 @@
         "test:watch": "vitest",
         "test:e2e": "playwright test",
         "typecheck": "vue-tsc --noEmit",
-        "format": "prettier --write resources/js resources/css",
-        "format:check": "prettier --check resources/js resources/css"
+        "format": "prettier --write resources/js resources/css scripts",
+        "format:check": "prettier --check resources/js resources/css scripts",
+        "models:encode": "node scripts/encode-model.mjs",
+        "models:verify": "node scripts/verify-models.mjs"
     },
     "devDependencies": {
+        "@gltf-transform/core": "^4.5.0",
+        "@gltf-transform/extensions": "^4.5.0",
+        "@gltf-transform/functions": "^4.5.0",
         "@inertiajs/vue3": "^2.3.27",
         "@playwright/test": "^1.62.1",
         "@tailwindcss/vite": "^4.3.3",
@@ -23,7 +28,9 @@
         "concurrently": "^9.0.1",
         "jsdom": "^26.1.0",
         "laravel-vite-plugin": "^1.2.0",
+        "meshoptimizer": "^0.25.0",
         "prettier": "^3.9.6",
+        "sharp": "^0.35.4",
         "tailwindcss": "^4.3.3",
         "typescript": "^5.9.3",
         "vite": "^6.0.11",
