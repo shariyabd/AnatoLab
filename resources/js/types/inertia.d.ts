@@ -33,5 +33,7 @@ declare module '@inertiajs/core' {
     auth: { user: AuthUser | null }
     navigation: Record<string, NavItem[]>
     flash: { success: string | null; error: string | null }
+    /** Kept in step with the meta tag by app.ts; see HandleInertiaRequests. */
+    csrfToken: string
   }
 }

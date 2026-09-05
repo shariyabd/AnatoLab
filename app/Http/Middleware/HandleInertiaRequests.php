@@ -58,6 +58,29 @@ final class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+
+            /*
+            | The current CSRF token, so the browser can keep
+            | `<meta name="csrf-token">` in step with the session.
+            |
+            | The meta tag is rendered once, when the document loads, but
+            | logging in and registering both call session()->regenerate() —
+            | and both are Inertia visits, so the document is never reloaded
+            | and the tag keeps the token from before the rotation. Every
+            | `fetch` in resources/js/composables then sends a token the
+            | session has replaced, and the student is told their session
+            | expired at the moment they signed in.
+            |
+            | Handover 14 found this walking PRD §44: a newly registered
+            | student could not ask the tutor, answer a question, run a
+            | mission, step a simulation, or record a lesson step, because
+            | every one of those is such a `fetch`.
+            |
+            | Not a secret: the same value is already in the page's own meta
+            | tag, and a CSRF token is only useful to the session that holds
+            | it.
+            */
+            'csrfToken' => $request->session()->token(),
         ];
     }
 
