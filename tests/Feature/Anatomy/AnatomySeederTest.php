@@ -19,9 +19,12 @@ beforeEach(function (): void {
     $this->seed(AnatomySeeder::class);
 });
 
-it('seeds the three MVP organs, published', function (): void {
+it('seeds the nine organs, published', function (): void {
     expect(Organ::query()->pluck('slug')->sort()->values()->all())
-        ->toBe(['brain', 'heart', 'lungs']);
+        ->toBe([
+            'brain', 'eyeball', 'heart', 'intestine', 'kidneys',
+            'liver', 'lungs', 'pancreas', 'skin',
+        ]);
 
     Organ::query()->get()->each(
         fn (Organ $organ) => expect($organ->status)->toBe(OrganStatus::Published)
@@ -48,7 +51,7 @@ it('leaves model_object_name null everywhere', function (): void {
 });
 
 it('attaches every organ to a body system', function (): void {
-    expect(BodySystem::query()->count())->toBe(3)
+    expect(BodySystem::query()->count())->toBe(7)
         ->and(Organ::query()->whereNull('body_system_id')->count())->toBe(0);
 });
 
@@ -74,11 +77,13 @@ it('is idempotent', function (): void {
     ])->toBe($before);
 });
 
-it('seeds placeholder model paths that the licence swap will replace', function (): void {
-    // public/models/manifest.json is "pending-licence" with an empty models
-    // array (docs/licence-log.md §3). If this ever fails because a real path
-    // landed, that is the swap commit and this expectation is what should be
-    // updated — not the seeder quietly diverging from the asset register.
+it('seeds a model path per organ, matching the manifest convention', function (): void {
+    // `modelPath` in public/models/manifest.json is `models/<slug>.glb`,
+    // relative to public/ (scripts/README.md). The seeder and the manifest have
+    // to agree on that shape or the viewer resolves a URL for a file that is
+    // not there. Files now exist locally, but the manifest still reads
+    // "pending-licence": nothing here may be deployed until docs/licence-log.md
+    // §4 records a decision.
     Organ::query()->get()->each(
         fn (Organ $organ) => expect($organ->model_path)->toBe("models/{$organ->slug}.glb")
     );
