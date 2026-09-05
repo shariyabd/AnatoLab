@@ -116,3 +116,16 @@ it clears, treat every reuse of upstream code or assets as provisional.
    repo (`docs/project-context.md` §4). Committing before this pushes into someone else's project.
 2. Start **01** and **02** together.
 3. Nothing else begins until 01 merges.
+
+---
+
+## Delivered
+
+Each lane's *delivery* document — what it actually built, what it decided and what it left
+open — is in [`delivered/`](delivered/README.md), one file per handover. Read a contract
+above for intent; read its delivery for the code.
+
+Two lanes published an interface the later lanes coded against:
+[`04-viewer-interface.md`](04-viewer-interface.md) and
+[`08-retrieval-seam.md`](08-retrieval-seam.md). The merge order the lanes were integrated in,
+and why it is not numeric, is in [`parallel-execution-plan.md`](parallel-execution-plan.md).
