@@ -35,6 +35,11 @@ final class DatabaseSeeder extends Seeder
             AchievementSeeder::class,
             // F11 → KnowledgeSeeder
             SimulationSeeder::class,
+
+            // Handover 14. Last on purpose: it asserts that every row PRD §44
+            // walks over was produced by the seeders above, then adds the
+            // knowledge corpus the demo's cited answer is retrieved from.
+            DemoSeeder::class,
         ]);
     }
 }

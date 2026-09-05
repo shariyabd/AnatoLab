@@ -8,28 +8,63 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ | Contrast is a measured property of these numbers, not a matter of taste, so
+ | the ratio each one has to clear is recorded next to it. Every value was
+ | checked against WCAG 2.2 with the browser doing the oklch → sRGB conversion,
+ | in both themes (PRD §31, handover 14's accessibility audit).
+ |
+ | The three light-theme values that changed in that audit are marked. They
+ | were readable but not compliant: accent-coloured labels and the "Mission
+ | complete" green sat between 3.3:1 and 4.2:1, which passes for large text and
+ | fails for the 12-14px it is actually used at.
+ */
 @theme {
   --color-surface: oklch(99% 0.003 265);
   --color-surface-raised: oklch(100% 0 0);
+
+  /* Decorative separators only — cards, dividers, table rules. */
   --color-border-subtle: oklch(91% 0.006 265);
-  --color-ink: oklch(23% 0.02 265);
-  --color-ink-muted: oklch(52% 0.015 265);
-  --color-accent: oklch(58% 0.16 255);
+
+  /*
+   | The boundary of an interactive control, where the border is the only thing
+   | saying where the control begins. SC 1.4.11 asks 3:1 for that; this is
+   | 3.56:1 on the page and 3.65:1 on a raised surface.
+   */
+  --color-border-strong: oklch(62% 0.02 265);
+
+  --color-ink: oklch(23% 0.02 265); /* 16.45:1 */
+  --color-ink-muted: oklch(52% 0.015 265); /* 5.36:1 */
+
+  /* Was 58%: label-on-button was 4.20:1. Now 4.94:1 there, 4.96:1 as text. */
+  --color-accent: oklch(54% 0.16 255);
   --color-accent-ink: oklch(99% 0.005 255);
-  --color-danger: oklch(56% 0.19 25);
-  --color-success: oklch(62% 0.14 155);
+
+  --color-danger: oklch(56% 0.19 25); /* 5.00:1 */
+
+  /* Was 62%: 3.33:1, and it is used at text-sm. Now 4.97:1. */
+  --color-success: oklch(52% 0.14 155);
 }
 
+/*
+ | The dark palette already cleared every threshold in the audit — nothing here
+ | moved except the addition of the control-boundary token, which the light
+ | theme needed and both themes now have.
+ */
 .dark {
   --color-surface: oklch(19% 0.015 265);
   --color-surface-raised: oklch(24% 0.018 265);
   --color-border-subtle: oklch(32% 0.02 265);
-  --color-ink: oklch(96% 0.006 265);
-  --color-ink-muted: oklch(72% 0.015 265);
-  --color-accent: oklch(72% 0.14 255);
+
+  /* 3.82:1 on the page, 3.41:1 on a raised surface. */
+  --color-border-strong: oklch(55% 0.02 265);
+
+  --color-ink: oklch(96% 0.006 265); /* 16.47:1 */
+  --color-ink-muted: oklch(72% 0.015 265); /* 7.46:1 */
+  --color-accent: oklch(72% 0.14 255); /* 7.44:1 as text, 7.57:1 under a label */
   --color-accent-ink: oklch(18% 0.02 255);
-  --color-danger: oklch(70% 0.16 25);
-  --color-success: oklch(74% 0.13 155);
+  --color-danger: oklch(70% 0.16 25); /* 6.46:1 */
+  --color-success: oklch(74% 0.13 155); /* 8.46:1 */
 }
 
 @layer base {
@@ -76,6 +111,101 @@
 }
 
 @layer components {
+  /*
+   | Long-form prose converted from a Markdown file — currently the attribution
+   | page, which renders docs/asset-register.md (handover 02 §6, handover 14).
+   |
+   | Scoped to a container class rather than styling bare elements globally,
+   | because everything else in the application is composed from utilities and a
+   | global `h2 { ... }` would reach into every page that has a heading. The
+   | register is a document of tables and status vocabulary, so the table rules
+   | are the load-bearing ones: a row a reader cannot line up is a licence
+   | status a reader cannot check.
+   */
+  .prose-doc {
+    @apply text-sm leading-relaxed text-[var(--color-ink)];
+  }
+
+  .prose-doc > * + * {
+    @apply mt-4;
+  }
+
+  /*
+   | Levels start at h2: AssetRegisterDocument pushes the source document's
+   | headings down one so the page keeps a single h1 of its own. h2 is
+   | therefore the document's title, h3 its sections.
+   */
+  .prose-doc h2 {
+    @apply mt-0 text-xl font-semibold tracking-tight;
+  }
+
+  .prose-doc h3 {
+    @apply mt-10 border-t border-[var(--color-border-subtle)] pt-6 text-lg font-semibold tracking-tight;
+  }
+
+  .prose-doc h4 {
+    @apply mt-8 text-base font-semibold;
+  }
+
+  .prose-doc h5 {
+    @apply mt-6 text-sm font-semibold;
+  }
+
+  .prose-doc p,
+  .prose-doc li {
+    @apply text-[var(--color-ink-muted)];
+  }
+
+  .prose-doc strong {
+    @apply font-semibold text-[var(--color-ink)];
+  }
+
+  .prose-doc a {
+    @apply text-[var(--color-accent)] underline underline-offset-2;
+  }
+
+  .prose-doc ul {
+    @apply list-disc space-y-1 pl-5;
+  }
+
+  .prose-doc ol {
+    @apply list-decimal space-y-1 pl-5;
+  }
+
+  .prose-doc code {
+    @apply rounded bg-[var(--color-surface-raised)] px-1 py-0.5 font-mono text-[0.8125em] text-[var(--color-ink)];
+  }
+
+  .prose-doc blockquote {
+    @apply border-l-2 border-[var(--color-border-subtle)] pl-4 italic;
+  }
+
+  .prose-doc hr {
+    @apply border-t border-[var(--color-border-subtle)];
+  }
+
+  /*
+   | A wide table must scroll inside its own box; the page must never scroll
+   | sideways. `display: block` on the table is what gives the wrapper something
+   | to overflow.
+   */
+  .prose-doc table {
+    @apply block w-full overflow-x-auto border-collapse text-left text-xs;
+  }
+
+  .prose-doc th,
+  .prose-doc td {
+    @apply border border-[var(--color-border-subtle)] px-3 py-2 align-top;
+  }
+
+  .prose-doc th {
+    @apply bg-[var(--color-surface-raised)] font-semibold text-[var(--color-ink)];
+  }
+
+  .prose-doc td {
+    @apply text-[var(--color-ink-muted)];
+  }
+
   .skip-link {
     @apply sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50
            focus:rounded-md focus:bg-[var(--color-accent)] focus:px-4 focus:py-2

@@ -31,7 +31,7 @@ function submit(): void {
           required
           :aria-invalid="Boolean(form.errors.email)"
           :aria-describedby="form.errors.email ? 'email-error' : undefined"
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         />
         <p
           v-if="form.errors.email"
@@ -52,7 +52,7 @@ function submit(): void {
           required
           :aria-invalid="Boolean(form.errors.password)"
           :aria-describedby="form.errors.password ? 'password-error' : undefined"
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         />
         <p
           v-if="form.errors.password"
@@ -63,8 +63,18 @@ function submit(): void {
         </p>
       </div>
 
-      <label class="flex items-center gap-2 text-sm">
-        <input v-model="form.remember" type="checkbox" />
+      <!--
+        The label is the target, not just the box: clicking anywhere in it
+        toggles the checkbox, which is what carries this past SC 2.5.8's 24px
+        minimum. The box itself is sized up from the 13px browser default so it
+        is visible as a control rather than as punctuation.
+      -->
+      <label class="flex w-fit items-center gap-2 py-1 text-sm">
+        <input
+          v-model="form.remember"
+          type="checkbox"
+          class="h-[1.125rem] w-[1.125rem] accent-[var(--color-accent)]"
+        />
         Remember me
       </label>
 

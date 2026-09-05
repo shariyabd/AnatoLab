@@ -32,7 +32,7 @@ function logout(): void {
 </script>
 
 <template>
-  <div class="min-h-screen">
+  <div class="flex min-h-screen flex-col">
     <!-- First tab stop on every page: skip the nav, reach the content. -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
@@ -87,7 +87,7 @@ function logout(): void {
       </nav>
     </header>
 
-    <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl px-4 py-8">
+    <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
       <div
         v-if="page.props.flash.success || page.props.flash.error"
         class="mb-6"
@@ -107,5 +107,25 @@ function logout(): void {
 
       <slot />
     </main>
+
+    <!--
+      Attribution has to be reachable from every page and without an account:
+      it is where the licence position is stated, and a credit a reader cannot
+      find is not a credit (PRD §42, docs/asset-register.md §6).
+    -->
+    <footer class="border-t border-[var(--color-border-subtle)]">
+      <div
+        class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 text-xs text-[var(--color-ink-muted)]"
+      >
+        <p>AnatoLab — an interactive 3D anatomy learning platform.</p>
+
+        <Link
+          href="/attribution"
+          class="underline underline-offset-2 hover:text-[var(--color-ink)]"
+        >
+          Attribution and licences
+        </Link>
+      </div>
+    </footer>
   </div>
 </template>

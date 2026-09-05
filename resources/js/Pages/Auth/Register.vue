@@ -43,7 +43,7 @@ function submit(): void {
           autocomplete="name"
           required
           :aria-invalid="Boolean(form.errors.name)"
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         />
         <p v-if="form.errors.name" class="mt-1 text-sm text-[var(--color-danger)]">
           {{ form.errors.name }}
@@ -59,7 +59,7 @@ function submit(): void {
           autocomplete="email"
           required
           :aria-invalid="Boolean(form.errors.email)"
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         />
         <p v-if="form.errors.email" class="mt-1 text-sm text-[var(--color-danger)]">
           {{ form.errors.email }}
@@ -71,7 +71,7 @@ function submit(): void {
         <select
           id="education_level"
           v-model="form.education_level"
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         >
           <option v-for="option in educationLevels" :key="option.value" :value="option.value">
             {{ option.label }}
@@ -89,7 +89,7 @@ function submit(): void {
         <select
           id="difficulty_preference"
           v-model="form.difficulty_preference"
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         >
           <option v-for="option in difficultyPreferences" :key="option.value" :value="option.value">
             {{ option.label }}
@@ -110,7 +110,7 @@ function submit(): void {
           required
           :aria-invalid="Boolean(form.errors.password)"
           :aria-describedby="form.errors.password ? 'password-error' : 'password-hint'"
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         />
         <p id="password-hint" class="mt-1 text-sm text-[var(--color-ink-muted)]">
           At least 10 characters.
@@ -134,7 +134,7 @@ function submit(): void {
           type="password"
           autocomplete="new-password"
           required
-          class="mt-1 w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2"
+          class="mt-1 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2"
         />
       </div>
 
