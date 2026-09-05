@@ -38,8 +38,16 @@ return [
             'order' => 10,
         ],
 
-        // F03/F05 → explore · F06 → lessons · F07 → quizzes
-        // F09 → missions · F10 → progress · F12 → simulations
+        [
+            'key' => 'explore',
+            'label' => 'Explore',
+            'route' => 'explore.index',
+            'icon' => 'cube',
+            'roles' => ['student', 'admin'],
+            'order' => 20,
+        ],
+
+        // F06 → lessons · F07 → quizzes · F09 → missions · F10 → progress · F12 → simulations
 
     ],
 
