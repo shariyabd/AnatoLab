@@ -34,7 +34,7 @@ final class DatabaseSeeder extends Seeder
             MissionSeeder::class,
             AchievementSeeder::class,
             // F11 → KnowledgeSeeder
-            // F12 → SimulationSeeder
+            SimulationSeeder::class,
         ]);
     }
 }
