@@ -29,7 +29,7 @@ final class DatabaseSeeder extends Seeder
             PlatformSeeder::class,
 
             AnatomySeeder::class,
-            // F06 → LessonSeeder
+            LessonSeeder::class,
             // F07 → AssessmentSeeder
             // F09 → MissionSeeder
             // F10 → AchievementSeeder
