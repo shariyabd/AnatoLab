@@ -20,4 +20,8 @@ return [
     // other lanes' models and registers the events endpoint's rate limiter, so
     // its position in this list does not matter.
     App\Providers\ProgressServiceProvider::class,
+
+    // Handover 13. Registers the admin authorization map (policies). Binds
+    // nothing else, so its position in this list does not matter.
+    App\Providers\AdminServiceProvider::class,
 ];

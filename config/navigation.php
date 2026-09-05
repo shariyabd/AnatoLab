@@ -93,7 +93,14 @@ return [
 
     'admin' => [
 
-        // F13 → content management, AI review queue, hotspot authoring
+        [
+            'key' => 'admin',
+            'label' => 'Admin',
+            'route' => 'admin.index',
+            'icon' => 'settings',
+            'roles' => ['admin'],
+            'order' => 10,
+        ],
 
     ],
 
