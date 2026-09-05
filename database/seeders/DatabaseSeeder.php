@@ -28,7 +28,7 @@ final class DatabaseSeeder extends Seeder
         $this->call([
             PlatformSeeder::class,
 
-            // F03 → AnatomySeeder
+            AnatomySeeder::class,
             // F06 → LessonSeeder
             // F07 → AssessmentSeeder
             // F09 → MissionSeeder
