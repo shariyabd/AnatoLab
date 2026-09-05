@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "status": "pending-licence",
+  "generatedAt": null,
+  "fitSize": 3.8,
+  "budgets": {
+    "maxModelBytes": 2097152,
+    "maxTriangles": 150000
+  },
+  "models": []
+}
