@@ -171,4 +171,83 @@ return [
         'temperature' => (float) env('AI_TUTOR_TEMPERATURE', 0.3),
     ],
 
+    /*
+    |---------------------------------------------------------------------------
+    | Embeddings
+    |---------------------------------------------------------------------------
+    |
+    | Added by Handover 11.
+    |
+    | Anthropic publishes no embeddings endpoint, so AnthropicProvider::
+    | generateEmbeddings() throws. Rather than making RAG require
+    | AI_PROVIDER=openai, this key names the provider used for embeddings only:
+    | leave it unset and embeddings use whichever provider `ai.provider` selected,
+    | or set it to `openai` to run Anthropic for chat and OpenAI for vectors.
+    | RagServiceProvider binds it contextually to EmbeddingService, so services
+    | still depend on AIProviderInterface and nothing else (invariant 2).
+    |
+    | `anthropic` is deliberately not accepted here: naming a provider that
+    | cannot embed should fail at boot, not at the first ingest.
+    |
+    */
+
+    'embeddings' => [
+        'provider' => env('AI_EMBEDDING_PROVIDER'),
+
+        /*
+        | Texts per embeddings request. Batched because ingest embeds thousands
+        | of chunks and the round trip, not the compute, is the cost.
+        */
+        'batch_size' => (int) env('AI_EMBEDDING_BATCH_SIZE', 64),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Knowledge base
+    |---------------------------------------------------------------------------
+    |
+    | Added by Handover 11 (docs/architecture.md §8.3).
+    |
+    */
+
+    'knowledge' => [
+        /*
+        | The private disk: storage/app/private, outside the web root. An
+        | uploaded corpus document is never served as a static file — a citation
+        | shows the passage that was retrieved, not the source PDF.
+        */
+        'disk' => env('KNOWLEDGE_DISK', 'local'),
+        'directory' => 'knowledge',
+
+        /*
+        | MIME type AND extension must both appear here (docs/engineering.md §10).
+        | Extension alone trusts the uploader; MIME alone is not specific enough
+        | — PHP detects a Markdown file's content as `text/plain`, so `text/plain`
+        | has to admit `.md`, and the extension is what says how to read it.
+        |
+        | Plain text and Markdown only, on purpose: every binary document format
+        | needs a parser dependency, and adding one requires human approval with
+        | a licence check (docs/engineering.md §5). F13's upload UI converts, or
+        | an admin pastes text.
+        |
+        | @var array<string, list<string>> MIME type => permitted extensions
+        */
+        'allowed_types' => [
+            'text/plain' => ['txt', 'text', 'md', 'markdown'],
+            'text/markdown' => ['md', 'markdown'],
+            'text/x-markdown' => ['md', 'markdown'],
+        ],
+
+        'max_upload_kilobytes' => (int) env('KNOWLEDGE_MAX_UPLOAD_KB', 8192),
+
+        /*
+        | ~500-token chunks with ~50 tokens of overlap (docs/architecture.md
+        | §8.3), counted in words because a word count needs no tokeniser and
+        | English prose runs about 0.75 words per token. Overlap exists so a
+        | definition split across a boundary still appears whole in one chunk.
+        */
+        'chunk_words' => (int) env('KNOWLEDGE_CHUNK_WORDS', 375),
+        'chunk_overlap_words' => (int) env('KNOWLEDGE_CHUNK_OVERLAP_WORDS', 38),
+    ],
+
 ];

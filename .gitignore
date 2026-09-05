@@ -41,3 +41,6 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Uploaded knowledge documents (runtime artefacts; the seeder regenerates them)
+/storage/app/private/

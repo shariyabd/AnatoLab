@@ -10,4 +10,9 @@ return [
     // baseline null bindings. Handover 11 appends RagServiceProvider below this
     // line; never reorder.
     App\Providers\AiServiceProvider::class,
+
+    // Handover 11. After AiServiceProvider so it can rebind
+    // VectorStoreInterface over the platform's baseline NullVectorStore without
+    // disturbing the AIProviderInterface binding above it.
+    App\Providers\RagServiceProvider::class,
 ];
