@@ -110,7 +110,8 @@ Append a row per contact. Never edit a row; add a new one.
 | 1 | 2026-09-05 | — | Licence status re-verified against the GitHub API. `license: null`, no LICENSE file at head `8c0e6f3`. | Confirmed all rights reserved |
 | 2 | 2026-09-05 | — | Request drafted (§2 above). **Not sent.** | **Requires a named human to send it** — it is outbound correspondence in a person's own name, and an agent must not send it on their behalf |
 | 3 | 2026-09-05 | — | Nine upstream GLBs fetched to a developer machine and run through `scripts/encode-model.mjs` so the viewer has geometry to load locally. Output lands in `public/models/`, which `.gitignore` excludes — **no upstream binary is committed to this repository or deployed**, and `manifest.json` still reads `"status": "pending-licence"`. | Unblocks local development only. The deployment gate in §4 is untouched and still open |
-| 4 | | | | |
+| 4 | 2026-09-06 | — | **Source re-audit under handover 02 Amendment A.** Every register row re-checked for whether its licence was verified or assumed. One assumed claim found: CAN-03 (NIH 3D) recorded "CC BY on every entry in this set", generalised from a catalogue statistic — corrected to per-entry, unverified. `docs/asset-sources.md` written as the sourcing gate; the same inaccurate NIH claim corrected in `docs/project-context.md` §3 and `docs/adding-an-organ.md`. No file downloaded. | No asset quarantined — nothing with an unverified licence is in the shipped set. The nine upstream GLBs stay `BLOCKED` (licence verified as *absent*, not unverifiable). Deployment gate in §4 unchanged and still open |
+| 5 | | | | |
 
 **Escalation trigger: 2026-09-19** (two weeks from the finding). If no grant has arrived
 by then, or a "no" arrives sooner, the replace path becomes the plan of record — see §4.

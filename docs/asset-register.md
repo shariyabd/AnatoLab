@@ -1,6 +1,6 @@
 # Asset Register
 
-**Owner:** Handover 02 (Content lane) · **Last updated:** 2026-09-05
+**Owner:** Handover 02 (Content lane) · **Last updated:** 2026-09-06
 **Release gate:** nothing deploys publicly until §6 is signed.
 
 Every model, texture and illustration that ships must have a row here. The rule is
@@ -10,7 +10,15 @@ fails if a manifest entry names an ID this file does not contain. A model withou
 cannot be recorded as shippable.
 
 Never assume open source means redistributable. Code and assets are audited separately —
-the audit trail for the licence question itself is `docs/licence-log.md`.
+the audit trail for the licence question itself is `docs/licence-log.md`, and the sources
+we are permitted to draw from at all are tiered in `docs/asset-sources.md`. A row here
+records what one asset *is*; that file records which wells may be drawn from and what
+each one costs. **Write the row before the download, not after.**
+
+**A licence is either verified or it is not recorded as one.** Every licence claim below
+states how it was checked. Where a source's terms are set per entry rather than per
+source — NIH 3D is the case that forced this rule — no source-level claim may stand in
+for the per-file check.
 
 **Status vocabulary**
 
@@ -35,8 +43,16 @@ the audit trail for the licence question itself is `docs/licence-log.md`.
 | Replacement model candidates | CAN-01 … CAN-03 | `CANDIDATE` | — |
 
 **Nothing is currently `CLEARED` to ship as a model.** `public/models/manifest.json` is
-therefore `"status": "pending-licence"` with an empty `models` array, and
-`scripts/verify-models.mjs --release` fails by design.
+therefore `"status": "pending-licence"` and `scripts/verify-models.mjs --release` fails
+by design.
+
+The manifest does carry nine rows (MDL-01…09): the upstream GLBs were encoded to budget
+on a developer machine so the viewer has geometry to load locally (`docs/licence-log.md`
+§3 row 3). **A manifest row is a budget measurement, not a licence.** `.gitignore`
+excludes `/public/models/*.glb`, no upstream binary is committed or deployed, and the
+`pending-licence` status is what keeps the gate shut. Note that plain
+`verify-models.mjs` checks only that a `registerId` *exists* here — it does not read the
+row's status, so nine `BLOCKED` assets pass it. Only `--release` closes that door.
 
 ---
 
@@ -142,19 +158,27 @@ single-mesh limitation in `docs/project-context.md` §2.2 — an upside, not a c
 
 Rights are recorded but **not exercised**: no candidate asset has been brought into this
 repository, and none becomes `CLEARED` until the decision in `docs/licence-log.md` §4 is
-signed. Licences and mesh structure below were verified against the sources themselves —
-archives downloaded and parsed, not read off a summary page.
+signed.
+
+**How each licence below was checked, precisely.** CAN-01 and CAN-02 were verified
+against the sources themselves — archives downloaded, `License.txt` and the `.obj`
+headers read, not a summary page. **CAN-03 was not, and could not be**: NIH 3D sets
+terms per entry, so there is no source-level licence to verify. Its row previously read
+"CC BY on every entry in this set" — that claim was **assumed from a catalogue
+statistic, not verified per entry**, and it is corrected below. The verdicts in this
+section are superseded by the tiering in `docs/asset-sources.md`, which is binding
+(handover 02, Amendment A).
 
 | | **CAN-01 BodyParts3D** | **CAN-02 Z-Anatomy** | **CAN-03 NIH 3D (HRA set)** |
 |---|---|---|---|
-| Licence | **Ambiguous** — see below | CC BY-SA 4.0, **contaminated** | **CC BY**, per model |
-| Share-alike | Unclear — that is the ambiguity | Yes | **No** |
-| Commercial / public use | Yes under either reading | **No** for kidney | **Yes** |
+| Licence | **Ambiguous** — see below | CC BY-SA 4.0, **contaminated** | **Per entry — no source-level licence** |
+| Share-alike | Unclear — that is the ambiguity | Yes | Per entry |
+| Commercial / public use | Yes under either reading | **No** for kidney | Per entry; ~19% of the Anatomy category is NC or ND |
 | Sub-meshes | 1,258 element OBJs, **shared across concepts** | 7,221 named objects — best labelling | Named per-structure meshes |
 | Format | OBJ only, no UVs, no materials | `.blend` only (307 MB) | **GLB** native, + STL/X3D/WRL |
 | Coverage of our nine | 9/9 | **8/9 — no skin** | 9/9 |
 | Bulk download | Yes, 62 MB zip, no login | Yes, 86 MB zip, no login | No bulk; per entry, no login |
-| Verdict | **Fallback**, conditional | **Rejected** | **Recommended primary** |
+| Verdict | **Secondary**, conditional | **Primary** | **Tertiary** — gaps and skeletal only |
 
 ### CAN-01 — BodyParts3D / Anatomography (DBCLS)
 
@@ -168,7 +192,7 @@ archives downloaded and parsed, not read off a summary page.
 | **Format** | Wavefront OBJ, positions and normals only. **No UVs, no `.mtl`, no textures, no colour.** 3.14 M triangles total; all parts share one whole-body coordinate frame in millimetres, which suits `FIT_SIZE` normalisation |
 | **Coverage** | 9/9 — heart `FMA7088`, brain `FMA50801`, lungs `FMA7309`/`FMA7310`, liver `FMA7197`, kidneys `FMA7204`/`FMA7205`, eyeball `FMA12514`/`FMA12515`, intestine `FMA7200`/`FMA7201`, pancreas `FMA7198`, skin `FMA7163` |
 | **Caveats** | Licence ambiguity is the blocker. Kidney and skin are one mesh each. Single-subject MRI segmentation, frozen at v4.0 (2011–2013). No glTF — 1,258 OBJs to convert |
-| **Status** | `CANDIDATE` — **fallback, conditional on DBCLS confirming the CC BY 4.0 relicence in writing** |
+| **Status** | `CANDIDATE` — **secondary tier** (`docs/asset-sources.md` §3.3), conditional on DBCLS confirming the CC BY 4.0 relicence in writing. Until it does, treat the licence as CC BY-SA 2.1 JP and assume share-alike attaches |
 
 ### CAN-02 — Z-Anatomy
 
@@ -180,9 +204,9 @@ archives downloaded and parsed, not read off a summary page.
 | **Attribution string** | "BodyParts3D - The Database Center for Life Science - CC-BY-SA 2.1 Japan" **and** "Z-Anatomy - The libre 3D atlas of anatomy - CC-BY-SA 4.0" |
 | **Granularity** | 7,221 distinct named objects, TA2-named with `.l`/`.r` laterality, plus a `TA2.csv` mapping. The best-labelled of the three — `Left ventricle` and `Right ventricle` exist as separate objects |
 | **Coverage** | **8/9. There is no skin.** A search of all 7,221 object names for skin, epidermis, dermis, integument and hypodermis returned nothing but `Nail plate` and `Hairs` |
-| **Blocker** | `License.txt` discloses included third-party models under **CC BY-NC 4.0 (Kidney, by Lissie Cowley)** and **CC BY-NC-SA 4.0 (Inner Ear)**. The kidney is one of our nine. A CC BY-NC component cannot legally sit inside a CC BY-SA 4.0 work — the bundle's own licensing is internally inconsistent, and any publicly deployed or commercially exposed use of that kidney is exposed |
+| **Named exclusions — not optional** | `License.txt` discloses included third-party models under **CC BY-NC 4.0 (Kidney, by Lissie Cowley)** and **CC BY-NC-SA 4.0 (Inner Ear)**. The kidney is one of our nine. A CC BY-NC component cannot legally sit inside a CC BY-SA 4.0 work — the bundle's own licensing is internally inconsistent, and that inconsistency is ours to route around, not to resolve. **Neither model may be used from this source.** Kidney comes from the secondary or tertiary tier instead, and skin does too (see Coverage). Recorded as a `BLOCKED` exclusion rather than a source-level blocker, because it is enumerable |
 | **Other caveats** | Share-alike would attach to every asset we publish. `.blend` only — a 307 MB monolith requiring a Blender toolchain in the pipeline. Last updated May 2023 |
-| **Status** | `CANDIDATE` — **rejected.** NC contamination on one of the nine organs, no skin, and share-alike on everything we would publish |
+| **Status** | `CANDIDATE` — **primary tier** (`docs/asset-sources.md` §3.2). This row previously read *rejected*; Amendment A overrules that. The defects did not change — the weighting did, because F17 makes per-structure identity the thing being bought, and Z-Anatomy is the only candidate that supplies it with TA2 naming already applied. **The contaminated kidney and inner ear are excluded by name** and must be sourced from another tier; share-alike attaches to every model we publish from here |
 
 ### CAN-03 — NIH 3D, HuBMAP Human Reference Atlas reference organs
 
@@ -190,31 +214,41 @@ archives downloaded and parsed, not read off a summary page.
 |---|---|
 | **Source** | `https://3d.nih.gov/` — the 76-entry "Organ, Sex" reference set, derived from the NLM Visible Human male and female |
 | **Creator** | Kristen Browne; Heidi Schlehlein (NIH) |
-| **Licence** | **CC BY** on every entry in this set. Catalogue-wide the licence **varies per model** and must be checked per model: of 719 Anatomy-category entries, 286 are Public Domain, 262 CC BY and 30 CC BY-SA, but **~19% are NC or ND** and unusable (e.g. `3DPX-000900` "Heart (CT)" is CC BY-NC). NIH states it does not enforce licence terms on contributors' behalf |
-| **Modification / redistribution / commercial** | ✓ / ✓ / ✓ — no share-alike |
+| **Licence** | **Per entry, and not verified per entry.** This row previously claimed CC BY on every entry in the 76-entry set; that was **assumed from a catalogue-level statistic**, and NIH 3D's Terms and Conditions §4.3 make licensing a choice of the uploading user, not of NIH — which does not enforce those terms on contributors' behalf. Catalogue-wide, of 719 Anatomy-category entries 286 are Public Domain, 262 CC BY and 30 CC BY-SA, but **~19% are NC or ND** and unusable (`3DPX-000900` "Heart (CT)" is CC BY-NC). **The 18 entries listed under Coverage below carry no verified licence and none may be downloaded until each has its own row here** |
+| **Modification / redistribution / commercial** | **Unknown until checked per entry.** A CC BY entry is ✓ / ✓ / ✓ with no share-alike; a CC BY-SA entry carries share-alike; an NC or ND entry is unusable |
 | **Attribution string** | Specified verbatim per model in the entry's `attributionInstructions`, with its own DOI, e.g. "Kristen Browne. 2021. *3D Reference Organ for Skin, Male v1.2.* https://doi.org/10.48539/HBM369.SBSP.863. Accessed on May 06, 2022." The access date must be updated to ours. **Each shipped organ needs its own row here carrying its own string** |
 | **Granularity** | Named per-structure meshes in the GLB itself. Heart (male) has 14: `VH_M_heart_left_ventricle`, `VH_M_heart_right_ventricle`, `VH_M_left_cardiac_atrium`, `VH_M_right_cardiac_atrium`, `VH_M_interventricular_septum`, four valves, five papillary muscles. Brain has 283 (Allen atlas names), lung 56 by bronchopulmonary segment, kidney 22, eye 23, liver 26 by Couinaud segment, large intestine 10, pancreas 5. Skin is a single mesh, as expected |
 | **Format** | **GLB** native, with STL/X3D/WRL auto-generated. Polycounts 12,886 (pancreas) to 346,625 (eye) — already in decimation range for `scripts/encode-model.mjs` |
 | **Coverage** | 9/9 across 18 entries: heart `3DPX-021000`/`020966`, brain `3DPX-020960`/`020959`, lung `3DPX-021008`/`020974`, liver `3DPX-021007`/`020973`, kidney `3DPX-021001`/`021002`/`020967`/`020968`, eye `3DPX-020998`/`020999`/`020962`/`020963`, intestine `3DPX-021017`/`020987` (small) and `3DPX-021005`/`020971` (large), pancreas `3DPX-021013`/`020983`, skin `3DPX-021016`/`020986` |
 | **Caveats** | No bulk download and **no supported public API** — the legacy REST API is gone (404). Two undocumented endpoints on the current site do work (`/api/entries/{id}`, `/api/files/{id}`); treat them as a one-time harvest, never a runtime dependency. The eye GLB is 27 MB and the brain has 283 meshes — both need real work in the pipeline. **Provenance:** derived from the NLM Visible Human cadavers. NLM replaced its data licence with plain Terms and Conditions in 2019, so there is no legal restriction, but the Visible Human Male provenance is an ethical disclosure point some educational publishers choose to make. That is a call for a human, not for this register |
-| **Status** | `CANDIDATE` — **recommended primary** |
+| **Status** | `CANDIDATE` — **tertiary tier** (`docs/asset-sources.md` §3.4): specific gaps only, plus CT-derived regional skeletal models for F16. Not a bulk source. Per-entry licence check and per-entry attribution string are mandatory before any download |
 
-### Recommendation
+### Recommendation — superseded
 
-**NIH 3D's HuBMAP reference-organ set.** It is the only candidate that satisfies all four
-constraints at once: plain CC BY with no share-alike, so a publicly deployed competition
-entry is unencumbered and our own code stays under whatever licence we choose; native GLB
-with named per-structure meshes, which removes the format conversion *and* the segmentation
-problem that `docs/project-context.md` §2.2 exists to work around; polycounts already inside
-decimation range; and 9/9 coverage across 18 identified entries.
+This section previously recommended **NIH 3D's HuBMAP reference-organ set as primary**, on
+the strength of "plain CC BY with no share-alike". **That premise does not hold.** NIH 3D
+sets terms per entry; the CC BY reading was a catalogue statistic generalised into a
+source-level grant, and generalising it is precisely the error handover 02 Amendment A
+was written to correct. A source whose licence must be re-established for every file is
+not a bulk primary, however good its meshes are.
 
-The costs are real and bounded: 18 files harvested individually through an unofficial
-endpoint, a per-model licence check that must actually be performed, and a verbatim
-per-model attribution string with its own DOI stored against each organ.
+**The tiering of record is `docs/asset-sources.md` §2:** Z-Anatomy primary, BodyParts3D
+secondary, NIH 3D tertiary for specific gaps and for the CT-derived regional skeletal
+models F16 needs. Read that file before sourcing anything; the per-source terms,
+attribution strings and share-alike status live there.
 
-**If this is adopted, F04's scope changes from *adapt* to *reimplement*, and F05/F07 gain
-real mesh raycasting.** Say so loudly to those lanes rather than letting them discover it —
-handover 02 is explicit about this, and `docs/licence-log.md` §4 records why.
+What survives from the original recommendation, unchanged by the correction:
+
+- **Per-structure meshes are the prize.** Every candidate in this section has them, which
+  is why replacement resolves the licence question and `docs/project-context.md` §2.2's
+  single-mesh limitation in one move.
+- **The costs are real and bounded** — a Blender export step for the primary, a written
+  confirmation to chase for the secondary, and a per-entry licence check plus a verbatim
+  DOI-bearing attribution string for anything from the tertiary.
+- **Whichever source is adopted, F04's scope changes from *adapt* to *reimplement*, and
+  F05/F07 gain real mesh raycasting.** Say so loudly to those lanes rather than letting
+  them discover it — handover 02 is explicit about this, and `docs/licence-log.md` §4
+  records why.
 
 ---
 
@@ -227,6 +261,8 @@ deployed publicly."*
 |---|---|
 | Asset set signed off | *none* |
 | Every shipped asset has a row above with a licence permitting public deployment | ☐ |
+| Every licence recorded above is **verified**, not assumed — re-audited 2026-09-06 | ☑ — one assumed claim found (CAN-03) and corrected; see §5 |
+| The source tiering in `docs/asset-sources.md` is committed before any download | ☑ |
 | Every shipped model is < 2 MB and < 150,000 triangles (`scripts/verify-models.mjs`) | ☐ |
 | Every shipped model is normalised to `FIT_SIZE = 3.8`, verified mechanically | ☐ |
 | Attribution strings surfaced in the About page (F14) | ☐ |

@@ -310,11 +310,17 @@ product aimed at students this is a content-quality risk independent of the lega
      snapping, screen-space sprite picking, render-on-demand, depth prepass. We
      reimplement them against Three.js from our own notes. Budget this as real work,
      not a rename.
-   - **Models:** replace with openly-licensed anatomy. Verified candidates:
-     **BodyParts3D / Anatomography** (CC BY-SA 2.1 JP, per-structure meshes — which
-     would *also* solve §2.2), **Z-Anatomy** (CC BY-SA, Blender source, per-structure),
-     **NIH 3D Print Exchange** (mostly public domain / CC0). All three give us real
-     sub-meshes and verified anatomy.
+   - **Models:** replace with openly-licensed anatomy. Candidates:
+     **Z-Anatomy** (CC BY-SA 4.0, Blender source, per-structure, TA2-named),
+     **BodyParts3D / Anatomography** (CC BY-SA 2.1 JP or CC BY 4.0 — contested;
+     per-structure meshes, which would *also* solve §2.2), and **NIH 3D**.
+     <br>**Correction, 2026-09-06:** this paragraph originally described NIH 3D as
+     *"mostly public domain / CC0"*. **That was wrong.** NIH 3D sets licensing per
+     entry, chosen by the uploading user, and does not enforce it on contributors'
+     behalf — roughly 19% of its Anatomy category is NC or ND. There is no blanket
+     grant and every file needs its own check. The tiering of record, with per-source
+     terms, is `docs/asset-sources.md`; the correction itself is handover 02
+     Amendment A.
 3. **Maintain an asset register** — `docs/asset-register.md`, one row per model,
    texture, and illustration: source, creator, license, modification rights,
    redistribution rights, commercial use, attribution string. No asset ships without a

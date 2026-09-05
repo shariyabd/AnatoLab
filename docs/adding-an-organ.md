@@ -32,35 +32,36 @@ way: the nine upstream models it started from carry no licence at all, which is 
 `public/models/manifest.json` still reads `"status": "pending-licence"` and why nothing
 deploys publicly until a human signs `docs/asset-register.md` §6.
 
-### Recommended source — NIH 3D
+### Go to `docs/asset-sources.md` first
 
-`https://3d.nih.gov/` — specifically the HuBMAP Human Reference Atlas "Organ, Sex" reference
-set. `docs/asset-register.md` §5 evaluated three sources properly (archives downloaded and
-parsed, not read off a summary page) and this is the recommendation:
+That file is the tiering of record and it is binding (handover 02, Amendment A). **A
+source that is not tiered there is not a source.** The short version:
 
-- **CC BY**, no share-alike. Your own code stays under whatever licence you choose.
-- **Native GLB** with **named per-structure meshes** — a heart with fourteen named parts,
-  not one blob. This is the thing the current models cannot do.
-- Polycounts 12,886–346,625, already inside `encode-model.mjs`'s decimation range.
-- 9/9 coverage of the organs shipped today, across 18 catalogue entries (IDs are listed in
-  the register).
+| Tier | Source | Licence | Share-alike | Reach for it when |
+|---|---|---|---|---|
+| **Primary** | **Z-Anatomy** | CC BY-SA 4.0 | **Yes** | Almost always. Per-structure meshes, TA2 names already applied — a heart whose parts are named, not one blob |
+| **Secondary** | **BodyParts3D / Anatomography** | Contested: the archive page says CC BY 4.0, the files' own headers say CC BY-SA 2.1 JP | Assume yes | Z-Anatomy renders the organ poorly or omits it — skin, for one |
+| **Tertiary** | **NIH 3D** | **Per entry.** No source-level licence | Per entry | A specific gap, or a CT-derived regional bone model for F16 |
 
-Two catches, both real:
+**Do not mix sources within a single organ.** Scale, topology and visual style differ
+enough that the result reads as assembled rather than made. Across organs is fine.
 
-- **Licence varies per model across the wider catalogue.** In the Anatomy category, ~19% are
-  NC or ND and unusable. `3DPX-000900` "Heart (CT)" is CC BY-NC, for example. Check the
-  entry you are downloading, every time. NIH states it does not enforce licence terms on
-  contributors' behalf.
-- **No bulk download and no supported API.** Harvest entries one at a time by hand. Two
-  undocumented endpoints on the current site do work; treat them as a one-time harvest and
-  never as a runtime dependency.
+Two traps, one per tier:
+
+- **Z-Anatomy is contaminated in two named places.** Its `License.txt` discloses a
+  **CC BY-NC 4.0 kidney** (by Lissie Cowley) and a **CC BY-NC-SA 4.0 inner ear**. Neither
+  may be used. Take those two from another tier. It also has **no skin at all**.
+- **NIH 3D has no blanket licence, and this guide used to claim it did.** Licensing is
+  chosen per entry by the uploading user; NIH does not enforce it on contributors'
+  behalf. In the Anatomy category ~19% are NC or ND and unusable — `3DPX-000900`
+  "Heart (CT)" is CC BY-NC. Check the entry you are downloading, **every time**, and
+  write its row before you download it. There is also no bulk download and no supported
+  API: harvest by hand, and never at runtime.
 
 ### Other sources worth knowing
 
 | Source | Licence | Verdict |
 |---|---|---|
-| **BodyParts3D / Anatomography** (DBCLS) | Contested: the archive page says CC BY 4.0, the files' own headers say CC BY-SA 2.1 JP | Fallback, only if DBCLS confirms the relicence in writing. OBJ only, no UVs or textures, and its 1,258 elements are shared between concepts rather than partitioning them |
-| **Z-Anatomy** | CC BY-SA 4.0, but contaminated | **Rejected.** Its kidney is CC BY-NC by a third party, which cannot legally sit inside a CC BY-SA work — and there is no skin at all |
 | Sketchfab / TurboSquid / CGTrader | Per-item | Usable, but read the item licence: "free" routinely means non-commercial or no-redistribution. An educational deployment is still a deployment |
 | Tripo / Meshy / other generative AI | Per-tool ToS | The models this project started from are Tripo output. They look convincing and are **anatomically unverified**, single-mesh, and hollow. Fine for layout, not for teaching |
 
@@ -87,8 +88,9 @@ them, and the register row is what `verify-models.mjs` enforces.
 - [ ] Source URL, and the DOI if there is one
 - [ ] Creator name, as they spell it
 - [ ] Licence, by SPDX identifier or full name — and the URL where you read it
-- [ ] The **verbatim attribution string** the licence demands. NIH 3D gives you one per
-      model in `attributionInstructions`, including an access date you must set to yours
+- [ ] The **verbatim attribution string** the licence demands — both lines for Z-Anatomy
+      (it credits BodyParts3D too). NIH 3D gives you one per model in
+      `attributionInstructions`, including an access date you must set to yours
 - [ ] Download date
 
 **About the anatomy** — this is the part people forget, and it is the part that takes time:
