@@ -32,7 +32,7 @@ final class DatabaseSeeder extends Seeder
             LessonSeeder::class,
             AssessmentSeeder::class,
             MissionSeeder::class,
-            // F10 → AchievementSeeder
+            AchievementSeeder::class,
             // F11 → KnowledgeSeeder
             // F12 → SimulationSeeder
         ]);
