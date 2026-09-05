@@ -17,6 +17,7 @@ Design and rules live in `docs/`:
 - `docs/engineering.md` — how we build it (the seven invariants, naming, typing, review gates)
 - `docs/project-context.md` — what we found in the upstream repo (load-bearing constraints)
 - `docs/feature-plan.md`, `docs/handovers/` — the numbered work lanes
+- `docs/adding-an-organ.md` — how to source, licence, encode and seed a new organ
 
 Two upstream facts constrain the design and are not negotiable without a plan change:
 the 3D models are **single-mesh** (no per-structure geometry — see `project-context.md` §2.2)
