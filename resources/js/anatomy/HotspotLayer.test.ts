@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PerspectiveCamera, Vector3 } from 'three'
+import { Color, PerspectiveCamera, Vector3 } from 'three'
 import { HotspotLayer, snapAllToSurface } from './HotspotLayer'
 import { HOTSPOT_SURFACE_OFFSET } from './constants'
 import { normaliseIntoFitCube } from './AssetManager'
@@ -10,6 +10,10 @@ function createNormalisedSphere() {
   const model = createFixtureModel()
   normaliseIntoFitCube(model)
   return model
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function createCamera(): PerspectiveCamera {
@@ -80,6 +84,20 @@ describe('snapAllToSurface', () => {
   })
 })
 
+/** Children are added halo-first, dot-second, one pair per structure. */
+function haloOf(layer: HotspotLayer, index = 0): MarkerQuad {
+  return layer.group.children[index * 2] as never as MarkerQuad
+}
+
+function dotOf(layer: HotspotLayer, index = 0): MarkerQuad {
+  return layer.group.children[index * 2 + 1] as never as MarkerQuad
+}
+
+interface MarkerQuad {
+  readonly material: { opacity: number; color: Color }
+  readonly scale: Vector3
+}
+
 describe('HotspotLayer', () => {
   let layer: HotspotLayer
   let container: HTMLElement
@@ -97,8 +115,8 @@ describe('HotspotLayer', () => {
     restoreCanvasContext()
   })
 
-  it('adds a dot and a ring per structure', () => {
-    layer.attach([createStructure()], createNormalisedSphere(), '#d1584f')
+  it('adds a dot and a halo per structure', () => {
+    layer.attach([createStructure()], createNormalisedSphere())
     expect(layer.group.children).toHaveLength(2)
     expect(layer.structures).toHaveLength(1)
   })
@@ -109,7 +127,7 @@ describe('HotspotLayer', () => {
     layer.dispose()
     layer = new HotspotLayer({ onIndexSelect })
     layer.mountIndex(container)
-    layer.attach([createStructure({ name: 'Left ventricle' })], createNormalisedSphere(), '#fff')
+    layer.attach([createStructure({ name: 'Left ventricle' })], createNormalisedSphere())
 
     const button = container.querySelector<HTMLButtonElement>('.hotspot-index button')
     expect(button?.textContent).toBe('Left ventricle')
@@ -121,7 +139,7 @@ describe('HotspotLayer', () => {
   it('reflects selection in the accessible list', () => {
     layer.mountIndex(container)
     const structure = createStructure()
-    layer.attach([structure], createNormalisedSphere(), '#fff')
+    layer.attach([structure], createNormalisedSphere())
 
     layer.setSelected(structure.id)
 
@@ -132,7 +150,7 @@ describe('HotspotLayer', () => {
     const organ = createNormalisedSphere()
     const front = createStructure({ id: 'front', anchorPosition: [0, 0, FIXTURE_RADIUS] })
     const back = createStructure({ id: 'back', anchorPosition: [0, 0, -FIXTURE_RADIUS] })
-    layer.attach([front, back], organ, '#fff')
+    layer.attach([front, back], organ)
 
     layer.update(createCamera())
 
@@ -148,7 +166,7 @@ describe('HotspotLayer', () => {
   it('picks the marker under the pointer', () => {
     const camera = createCamera()
     const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
-    layer.attach([structure], createNormalisedSphere(), '#fff')
+    layer.attach([structure], createNormalisedSphere())
     layer.update(camera)
 
     const screen = layer.screenPosition(structure.id, camera, 800, 600)!
@@ -160,7 +178,7 @@ describe('HotspotLayer', () => {
   it('returns nothing when the pointer is outside the pick radius', () => {
     const camera = createCamera()
     const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
-    layer.attach([structure], createNormalisedSphere(), '#fff')
+    layer.attach([structure], createNormalisedSphere())
     layer.update(camera)
 
     const screen = layer.screenPosition(structure.id, camera, 800, 600)!
@@ -171,7 +189,7 @@ describe('HotspotLayer', () => {
     // Clicking through the organ to its far side is never what the student meant.
     const camera = createCamera()
     const back = createStructure({ id: 'back', anchorPosition: [0, 0, -FIXTURE_RADIUS] })
-    layer.attach([back], createNormalisedSphere(), '#fff')
+    layer.attach([back], createNormalisedSphere())
     layer.update(camera)
 
     const screen = layer.screenPosition(back.id, camera, 800, 600)!
@@ -182,7 +200,7 @@ describe('HotspotLayer', () => {
   it('picks nothing at all in author mode', () => {
     const camera = createCamera()
     const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
-    layer.attach([structure], createNormalisedSphere(), '#fff')
+    layer.attach([structure], createNormalisedSphere())
     layer.update(camera)
     const screen = layer.screenPosition(structure.id, camera, 800, 600)!
 
@@ -194,7 +212,7 @@ describe('HotspotLayer', () => {
   it('flashes green for correct and red for wrong', () => {
     const camera = createCamera()
     const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
-    layer.attach([structure], createNormalisedSphere(), '#ffffff')
+    layer.attach([structure], createNormalisedSphere())
 
     layer.flash(structure.id, true)
     layer.update(camera)
@@ -214,7 +232,7 @@ describe('HotspotLayer', () => {
 
   it('keeps the loop awake only while something is animating', () => {
     const structure = createStructure()
-    layer.attach([structure], createNormalisedSphere(), '#fff')
+    layer.attach([structure], createNormalisedSphere())
 
     expect(layer.isAnimating).toBe(false)
     layer.flash(structure.id, true)
@@ -225,7 +243,7 @@ describe('HotspotLayer', () => {
     const camera = createCamera()
     const solo = createStructure({ id: 'solo', anchorPosition: [0, 0, FIXTURE_RADIUS] })
     const other = createStructure({ id: 'other', anchorPosition: [0, FIXTURE_RADIUS, 0] })
-    layer.attach([solo, other], createNormalisedSphere(), '#fff')
+    layer.attach([solo, other], createNormalisedSphere())
 
     layer.setSolo('solo')
     layer.update(camera)
@@ -238,7 +256,7 @@ describe('HotspotLayer', () => {
 
   it('holds a marker the same size on screen as the camera dollies', () => {
     const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
-    layer.attach([structure], createNormalisedSphere(), '#fff')
+    layer.attach([structure], createNormalisedSphere())
 
     const near = createCamera()
     layer.update(near)
@@ -254,8 +272,119 @@ describe('HotspotLayer', () => {
     expect(farScale / nearScale).toBeCloseTo((12 - FIXTURE_RADIUS) / (6 - FIXTURE_RADIUS), 1)
   })
 
+  it('draws a resting marker in the hotspot colour and an active one in the live colour', () => {
+    // Handover 15 phase 4. Markers take no colour from the organ or the
+    // structure: a marker has to be legible on pale lung and dark liver alike,
+    // and it has to say which of two states it is in.
+    const camera = createCamera()
+    const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
+    layer.attach([structure], createNormalisedSphere())
+
+    layer.update(camera)
+    expect(dotOf(layer).material.color.getHex()).toBe(0xe8722e)
+
+    layer.setSelected(structure.id)
+    layer.update(camera)
+    expect(dotOf(layer).material.color.getHex()).toBe(0x2563eb)
+  })
+
+  it('ignores the structure marker colour the organ data carries', () => {
+    // `StructureDto.markerColor` is still in the contract and still drives the
+    // structure list and the callout dot. It does not drive the canvas.
+    const camera = createCamera()
+    const structure = createStructure({
+      anchorPosition: [0, 0, FIXTURE_RADIUS],
+      markerColor: '#6e8bb5',
+    })
+    layer.attach([structure], createNormalisedSphere())
+
+    layer.update(camera)
+
+    expect(dotOf(layer).material.color.getHex()).toBe(0xe8722e)
+  })
+
+  it('keeps the ring and its drop shadow white at every state', () => {
+    // The halo is what makes an orange dot readable on orange tissue. Tinting it
+    // with the state colour would remove its only reason to exist.
+    const camera = createCamera()
+    const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
+    layer.attach([structure], createNormalisedSphere())
+
+    layer.update(camera)
+    expect(haloOf(layer).material.color.getHex()).toBe(0xffffff)
+
+    layer.setSelected(structure.id)
+    layer.update(camera)
+    expect(haloOf(layer).material.color.getHex()).toBe(0xffffff)
+
+    layer.flash(structure.id, false)
+    layer.update(camera)
+    expect(haloOf(layer).material.color.getHex()).toBe(0xffffff)
+  })
+
+  it('scales an activated marker in once and then stops', async () => {
+    // Once, not for ever. A looping pulse means every frame is a changed frame,
+    // which spends the whole render-on-demand budget on decoration
+    // (docs/architecture.md §15.1).
+    const camera = createCamera()
+    const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
+    layer.attach([structure], createNormalisedSphere())
+    layer.update(camera)
+    const resting = dotOf(layer).scale.x
+
+    layer.setSelected(structure.id)
+    layer.update(camera)
+
+    expect(dotOf(layer).scale.x).toBeLessThan(resting * 1.35)
+    expect(layer.isAnimating).toBe(true)
+
+    await sleep(450)
+    layer.update(camera)
+
+    expect(dotOf(layer).scale.x / resting).toBeCloseTo(1.35, 2)
+    expect(layer.isAnimating).toBe(false)
+  })
+
+  it('lands on the active size immediately under reduced motion', async () => {
+    layer.dispose()
+    layer = new HotspotLayer({ reducedMotion: true })
+
+    const camera = createCamera()
+    const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
+    layer.attach([structure], createNormalisedSphere())
+    layer.update(camera)
+    const resting = dotOf(layer).scale.x
+
+    layer.setSelected(structure.id)
+    layer.update(camera)
+
+    expect(dotOf(layer).scale.x / resting).toBeCloseTo(1.35, 5)
+    // The size difference is the signal; the 400 ms getting there is not, so
+    // nothing keeps the loop awake for it.
+    expect(layer.isAnimating).toBe(false)
+  })
+
+  it('restarts the ease only when a marker was not already active', async () => {
+    const camera = createCamera()
+    const structure = createStructure({ anchorPosition: [0, 0, FIXTURE_RADIUS] })
+    layer.attach([structure], createNormalisedSphere())
+
+    layer.setSelected(structure.id)
+    await sleep(450)
+    layer.update(camera)
+    const settled = dotOf(layer).scale.x
+
+    // A lesson highlighting the structure the student already selected must not
+    // make the marker jump back to its resting size and grow again.
+    layer.setHighlighted(structure.id)
+    layer.update(camera)
+
+    expect(dotOf(layer).scale.x).toBeCloseTo(settled, 5)
+    expect(layer.isAnimating).toBe(false)
+  })
+
   it('frees its quad and textures on dispose', () => {
-    layer.attach([createStructure()], createNormalisedSphere(), '#fff')
+    layer.attach([createStructure()], createNormalisedSphere())
     const material = (layer.group.children[1] as never as { material: { dispose(): void } })
       .material
     const spy = vi.spyOn(material, 'dispose')

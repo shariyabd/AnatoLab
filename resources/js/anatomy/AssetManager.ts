@@ -25,6 +25,7 @@ import {
   Box3,
   LinearSRGBColorSpace,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   Vector3,
   type Group,
@@ -38,6 +39,23 @@ import { disposeObject3D } from './dispose'
 
 /** How many organs stay resident. Matches the audited limit. */
 const CACHE_LIMIT = 3
+
+/**
+ * The tissue look (handover 15 phase 6).
+ *
+ * The models carry one baked roughness map authored for a matte preview, and
+ * against the room environment that reads as dry plastic. Organs are wet: they
+ * have a thin, slightly diffuse specular coat over a fairly glossy base. That is
+ * exactly what `clearcoat` describes, and the three numbers below are the whole
+ * difference between a render that looks like an anatomical specimen and one
+ * that looks like a grey blob with a texture on it.
+ *
+ * `roughness` multiplies the baked map rather than replacing it, so the map's
+ * variation survives — this only moves where its midpoint sits.
+ */
+const TISSUE_ROUGHNESS = 0.45
+const TISSUE_CLEARCOAT = 0.25
+const TISSUE_CLEARCOAT_ROUGHNESS = 0.4
 
 /**
  * The narrow slice of `GLTFLoader` this class uses.
@@ -244,26 +262,31 @@ export class AnatomyAssetManager {
     return loader
   }
 
+  /**
+   * Prepares every material on a freshly loaded model for the atelier render.
+   *
+   * A glTF material is shared between primitives far more often than a geometry
+   * is, so the upgrade below is memoised per source material: two primitives
+   * that arrived sharing one material leave sharing one material. Doing it per
+   * mesh would silently double the shader programs and the texture bindings.
+   */
   #conditionMaterials(root: Object3D): void {
     const anisotropy = this.#options.maxAnisotropy ?? 1
-    const seen = new Set<Material>()
+    const upgraded = new Map<Material, Material>()
 
     root.traverse((object) => {
       if (!(object instanceof Mesh)) return
 
       // Every model is one baked surface shell (docs/project-context.md §2.2),
       // so shadow casting buys a self-shadowing artefact and nothing else. The
-      // contact shadow under the plinth is baked instead.
+      // contact shadow under the organ is baked instead.
       object.castShadow = false
       object.receiveShadow = false
       object.frustumCulled = true
 
-      const materials = Array.isArray(object.material) ? object.material : [object.material]
-      for (const material of materials) {
-        if (seen.has(material)) continue
-        seen.add(material)
-        conditionMaterial(material, anisotropy)
-      }
+      object.material = Array.isArray(object.material)
+        ? object.material.map((material) => conditionOnce(material, upgraded, anisotropy))
+        : conditionOnce(object.material, upgraded, anisotropy)
     })
   }
 
@@ -328,8 +351,27 @@ export function countTriangles(root: Object3D): number {
   return Math.round(triangles)
 }
 
-function conditionMaterial(material: Material, anisotropy: number): void {
-  for (const value of Object.values(material)) {
+function conditionOnce(
+  material: Material,
+  upgraded: Map<Material, Material>,
+  anisotropy: number,
+): Material {
+  const existing = upgraded.get(material)
+  if (existing !== undefined) return existing
+
+  const conditioned = conditionMaterial(material, anisotropy)
+  upgraded.set(material, conditioned)
+  return conditioned
+}
+
+/**
+ * Returns the material the mesh should use — the same object, or a physical
+ * replacement for it.
+ */
+function conditionMaterial(material: Material, anisotropy: number): Material {
+  const conditioned = toPhysical(material)
+
+  for (const value of Object.values(conditioned)) {
     if (isTexture(value)) {
       // Anisotropy on *every* sampled map, not just the colour map: a normal or
       // roughness map sampled at a grazing angle shimmers just as badly, and
@@ -340,16 +382,57 @@ function conditionMaterial(material: Material, anisotropy: number): void {
     }
   }
 
-  if (material instanceof MeshStandardMaterial) {
+  if (conditioned instanceof MeshStandardMaterial) {
     // The models carry a single baked colour/normal/roughness set
     // (docs/project-context.md §2.2). Let the room environment do the lighting
     // rather than fighting it with a strong specular response.
-    material.envMapIntensity = 1
-    material.flatShading = false
-    if (material.aoMap !== null) material.aoMapIntensity = 1
-    if (material.lightMap !== null) material.lightMap.colorSpace = LinearSRGBColorSpace
-    material.needsUpdate = true
+    conditioned.envMapIntensity = 1
+    conditioned.flatShading = false
+    conditioned.roughness = TISSUE_ROUGHNESS
+    if (conditioned.aoMap !== null) conditioned.aoMapIntensity = 1
+    if (conditioned.lightMap !== null) conditioned.lightMap.colorSpace = LinearSRGBColorSpace
   }
+
+  if (conditioned instanceof MeshPhysicalMaterial) {
+    conditioned.clearcoat = TISSUE_CLEARCOAT
+    conditioned.clearcoatRoughness = TISSUE_CLEARCOAT_ROUGHNESS
+  }
+
+  conditioned.needsUpdate = true
+  return conditioned
+}
+
+/**
+ * Re-homes a standard material onto `MeshPhysicalMaterial`, which is the only
+ * one of the two that has a clearcoat.
+ *
+ * Two things here are deliberate and both are easy to get wrong:
+ *
+ * - `MeshStandardMaterial.prototype.copy`, not `physical.copy(source)`. The
+ *   physical version reads the physical-only fields off its argument, and a
+ *   standard material has none of them, so it writes `undefined` into
+ *   `iridescenceIOR`, `anisotropyRotation` and a dozen others. Copying the
+ *   standard subset and leaving the physical defaults alone is what is wanted.
+ * - Restoring `defines`. `MeshStandardMaterial.copy` overwrites it with
+ *   `{ STANDARD: '' }`, which drops the `PHYSICAL` flag the shader is selected
+ *   by — the material would compile as a standard one and the clearcoat would
+ *   silently do nothing.
+ *
+ * The discarded shell is disposed with a plain `dispose()` rather than
+ * `disposeMaterial()`: its textures are now the physical material's textures,
+ * and freeing them here would leave the model rendering untextured.
+ */
+function toPhysical(material: Material): Material {
+  if (material instanceof MeshPhysicalMaterial) return material
+  if (!(material instanceof MeshStandardMaterial)) return material
+
+  const physical = new MeshPhysicalMaterial()
+  const defines = physical.defines
+  MeshStandardMaterial.prototype.copy.call(physical, material)
+  physical.defines = defines
+
+  material.dispose()
+  return physical
 }
 
 function isTexture(value: unknown): value is Texture {
