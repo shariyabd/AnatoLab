@@ -1,4 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  ACESFilmicToneMapping,
+  Box3,
+  Color,
+  Light,
+  Mesh,
+  MeshBasicMaterial,
+  MeshPhysicalMaterial,
+  SRGBColorSpace,
+  SphereGeometry,
+  Vector3,
+  type Object3D,
+  type Scene,
+} from 'three'
 import { AnatomyViewer } from './AnatomyViewer'
 import { FIT_SIZE } from './constants'
 import { GUIDED_TOUR_ID } from './animation'
@@ -66,6 +80,34 @@ function sleep(ms: number): Promise<void> {
 async function settle(renderer: FakeWebGLRenderer): Promise<number> {
   await sleep(600)
   return renderer.info.render.calls
+}
+
+/**
+ * The scene the viewer actually drew, captured by the fake renderer. The scene
+ * graph is private, and going through the thing that renders it is the only way
+ * to assert on it without opening a hole in the class for a test.
+ */
+async function drawnScene(harness: Harness): Promise<Object3D> {
+  await nextFrame(harness.renderer)
+  const scene = harness.renderer.scene
+  expect(scene).not.toBeNull()
+  return scene!
+}
+
+/** Every mesh the viewer put in the scene itself, excluding organ and markers. */
+function stageMeshes(scene: Object3D): Mesh[] {
+  return scene.children.filter((child): child is Mesh => child instanceof Mesh)
+}
+
+function organMaterial(harness: Harness): MeshPhysicalMaterial {
+  const model = harness.loader.models[0]!
+  return (model.children[0] as Mesh<SphereGeometry, MeshPhysicalMaterial>).material
+}
+
+function saturationOf(color: Color): number {
+  const hsl = { h: 0, s: 0, l: 0 }
+  color.getHSL(hsl)
+  return hsl.s
 }
 
 describe('AnatomyViewer', () => {
@@ -462,6 +504,132 @@ describe('AnatomyViewer', () => {
     })
   })
 
+  describe('render quality', () => {
+    it('configures the colour pipeline on whatever renderer it was handed', async () => {
+      // Handover 15 phase 6. These are a property of the image the viewer
+      // promises, not of how the context happened to be created, so a host that
+      // supplies its own renderer gets the same one.
+      harness = mountViewer()
+
+      expect(harness.renderer.outputColorSpace).toBe(SRGBColorSpace)
+      expect(harness.renderer.toneMapping).toBe(ACESFilmicToneMapping)
+      expect(harness.renderer.toneMappingExposure).toBeCloseTo(1.05, 5)
+      expect(harness.renderer.localClippingEnabled).toBe(true)
+    })
+
+    it('stands the organ on a soft contact shadow and nothing else', async () => {
+      // The hard grey disc this replaced was the most prominent thing on the
+      // stage whenever a model had not loaded (handover 15 phase 3).
+      stubWebGLSupport({ twoD: true })
+      harness = mountViewer()
+      await harness.viewer.loadOrgan(createOrgan())
+
+      const meshes = stageMeshes(await drawnScene(harness))
+      expect(meshes).toHaveLength(1)
+
+      const shadow = meshes[0]!
+      const material = shadow.material as MeshBasicMaterial
+      expect(shadow.name).toBe('contact-shadow')
+      expect(material.transparent).toBe(true)
+      expect(material.map).not.toBeNull()
+      expect(material.depthWrite).toBe(false)
+    })
+
+    it('fits the shadow to the organ standing on it', async () => {
+      stubWebGLSupport({ twoD: true })
+      harness = mountViewer()
+      await harness.viewer.loadOrgan(createOrgan())
+
+      const shadow = stageMeshes(await drawnScene(harness))[0]!
+      const bounds = new Box3().setFromObject(harness.loader.models[0]!)
+      const size = bounds.getSize(new Vector3())
+
+      // Wider than the organ, so it reads as contact rather than as a decal.
+      expect(shadow.scale.x).toBeGreaterThan(size.x)
+      expect(shadow.scale.y).toBeGreaterThan(size.z)
+      expect(shadow.position.y).toBeLessThanOrEqual(bounds.min.y)
+    })
+
+    it('keeps the shadow off screen until there is a model to cast it', async () => {
+      // The canvas is transparent over a white card, so a shadow with nothing
+      // above it is just a grey lens laid over the paper.
+      stubWebGLSupport({ twoD: true })
+      harness = mountViewer()
+
+      const shadow = stageMeshes(await drawnScene(harness))[0]!
+      expect(shadow.visible).toBe(false)
+    })
+
+    it('builds the lighting rig and its environment once, not once per organ', async () => {
+      // PMREM convolution is the most expensive thing that happens at start-up
+      // and the room is the same room for every organ, so handover 15 phase 6
+      // asks for this to be verified rather than assumed.
+      //
+      // What is verified here is the rig, not the convolution: PMREM needs
+      // render targets that a renderer with no GPU behind it cannot provide, so
+      // `scene.environment` is null in jsdom and its identity proves nothing on
+      // its own. The lights are built on the same line of the same method, so a
+      // second organ rebuilding the rig would show up as four lights here.
+      stubWebGLSupport({ twoD: true })
+      harness = mountViewer()
+
+      await harness.viewer.loadOrgan(createOrgan())
+      const first = (await drawnScene(harness)) as Scene
+      const environment = first.environment
+
+      await harness.viewer.loadOrgan(
+        createOrgan({ id: 'org_brain', modelUrl: '/models/brain.glb' }),
+      )
+      const second = (await drawnScene(harness)) as Scene
+
+      expect(second.children.filter((child) => child instanceof Light)).toHaveLength(2)
+      expect(second.environment).toBe(environment)
+    })
+
+    it('tints the organ towards a muted version of its accent', async () => {
+      // Phase 6: real tissue is muted. `organs.accent` is a UI colour and
+      // arrives far more saturated than any organ ever is.
+      harness = mountViewer()
+      const organ = createOrgan({ accentColor: '#d1584f' })
+      await harness.viewer.loadOrgan(organ)
+
+      const tinted = organMaterial(harness).color
+      const accent = new Color(organ.accentColor)
+
+      expect(tinted.getHex()).not.toBe(0xffffff)
+      expect(saturationOf(tinted)).toBeGreaterThan(0)
+      expect(saturationOf(tinted)).toBeLessThan(saturationOf(accent))
+      expect(tinted.r).toBeGreaterThan(tinted.b)
+    })
+
+    it('does not compound the tint when the organ is revisited from cache', async () => {
+      // Three models stay resident, so a second visit hands back the same
+      // material object. Re-blending would walk the heart towards its own
+      // accent one navigation at a time.
+      harness = mountViewer()
+      const organ = createOrgan()
+
+      await harness.viewer.loadOrgan(organ)
+      const first = organMaterial(harness).color.clone()
+      await harness.viewer.loadOrgan(organ)
+
+      expect(organMaterial(harness).color.getHex()).toBe(first.getHex())
+    })
+
+    it('restores the organ tint, not the bare map colour, when a simulation clears its own', async () => {
+      harness = mountViewer()
+      const organ = createOrgan()
+      await harness.viewer.loadOrgan(organ)
+      const tinted = organMaterial(harness).color.clone()
+
+      harness.viewer.applySimulationState({ state: {}, visualDirectives: { tint: '#3355ff' } })
+      expect(organMaterial(harness).color.getHex()).not.toBe(tinted.getHex())
+
+      harness.viewer.applySimulationState({ state: {}, visualDirectives: { tint: null } })
+      expect(organMaterial(harness).color.getHex()).toBe(tinted.getHex())
+    })
+  })
+
   describe('render-on-demand', () => {
     it('stops drawing once the scene has settled', async () => {
       harness = mountViewer()
@@ -470,6 +638,24 @@ describe('AnatomyViewer', () => {
 
       const settled = await settle(harness.renderer)
       await sleep(150)
+
+      expect(harness.renderer.info.render.calls).toBe(settled)
+    })
+
+    it('settles again after an activation scale-in', async () => {
+      // The one-shot marker ease added in handover 15 phase 4 must end. If it
+      // looped, the idle frame cost in docs/architecture.md §15.1 would stop
+      // being ~0 the first time a student clicked anything.
+      harness = mountViewer({ reducedMotion: false })
+      const organ = createOrgan()
+      await harness.viewer.loadOrgan(organ)
+      await settle(harness.renderer)
+
+      harness.viewer.selectStructure(organ.structures[0]!.id)
+      await nextFrame(harness.renderer)
+
+      const settled = await settle(harness.renderer)
+      await sleep(200)
 
       expect(harness.renderer.info.render.calls).toBe(settled)
     })
@@ -549,6 +735,27 @@ describe('AnatomyViewer', () => {
       expect(liveRenderers.count).toBe(0)
       expect(renderer.disposed).toBe(true)
       expect(renderer.contextLost).toBe(true)
+    })
+
+    it('frees the generated marker and contact-shadow textures too', async () => {
+      // The rest of the suite runs with no 2D canvas, where those four textures
+      // are never created — so without this the disposal path for the art the
+      // viewer draws itself has no coverage at all. Handover 15 adds a texture
+      // under the organ and rebuilds the two marker textures, which makes that
+      // gap worth closing rather than noting.
+      stubWebGLSupport({ twoD: true })
+      harness = mountViewer()
+      await harness.viewer.loadOrgan(createOrgan())
+      await nextFrame(harness.renderer)
+
+      const { renderer } = harness
+      const withGeneratedArt = renderer.info.memory.textures
+      expect(withGeneratedArt).toBeGreaterThan(1)
+
+      harness.viewer.dispose()
+
+      expect(renderer.info.memory.textures).toBe(0)
+      expect(renderer.info.memory.geometries).toBe(0)
     })
 
     it('leaks nothing across a second organ load', async () => {

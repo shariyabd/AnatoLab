@@ -44,8 +44,8 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   PerspectiveCamera,
+  PlaneGeometry,
   PMREMGenerator,
   Plane,
   Raycaster,
@@ -67,6 +67,7 @@ import { HotspotLayer, type HotspotScreenPosition } from './HotspotLayer'
 import { TypedEmitter } from './emitter'
 import { disposeObject3D, disposeMaterial } from './dispose'
 import { probeWebGL, type WebGLProbe } from './webgl'
+import { SHADOW_INK } from './palette'
 import { GUIDED_TOUR_ID, buildGuidedTour, type AnimationStep } from './animation'
 import type { SimulationState, VisualDirectives } from './simulation'
 import type {
@@ -93,9 +94,48 @@ const FOCUS_DISTANCE = FIT_SIZE * 0.85
 
 /** Keep drawing this long after an interaction so damping settles visibly. */
 const SETTLE_MS = 450
-const CAMERA_TWEEN_S = 0.85
+
+/**
+ * Camera travel on an organ or structure change. Handover 15 phase 6 asks for
+ * ~700 ms and an ease-*out*: the previous 850 ms `power2.inOut` accelerated out
+ * of the old framing, which reads as the model being dragged rather than the
+ * camera arriving.
+ *
+ * Under `prefers-reduced-motion` there is no tween at all — see `#flyTo`.
+ */
+const CAMERA_TWEEN_S = 0.7
 const CROSSFADE_S = 0.35
 const ISOLATED_OPACITY = 0.35
+
+/**
+ * The contact shadow, sized as a multiple of the model's own footprint.
+ *
+ * Handover 15 phase 3 replaces the hard grey disc that used to render here with
+ * a soft ellipse that fades to nothing at its edge. It is a gradient-textured
+ * plane, not a shadow map: a shadow map needs a second render pass every frame
+ * the light or the model moves, which would end render-on-demand and with it the
+ * ~0 idle frame budget (docs/architecture.md §15.1).
+ *
+ * Slightly wider than the organ, because a shadow the exact size of the thing
+ * casting it reads as a decal rather than as contact.
+ */
+const CONTACT_SHADOW_FOOTPRINT = 1.25
+const CONTACT_SHADOW_OPACITY = 0.9
+
+/** Named so a test can prove it is the *only* thing under the organ. */
+const CONTACT_SHADOW_NAME = 'contact-shadow'
+
+/**
+ * How much of the organ's accent colour reaches the baked colour map, and how
+ * much of the accent's own saturation survives the trip (handover 15 phase 6).
+ *
+ * `organs.accent` is a UI colour — it has to hold up as a 2 px border on white —
+ * so it arrives far more saturated than tissue ever is. Desaturating it first
+ * and then blending gently is what lets the lighting create the depth instead
+ * of the saturation slider.
+ */
+const ORGAN_TINT_STRENGTH = 0.18
+const ORGAN_TINT_SATURATION = 0.35
 
 /** Pointer travel, in pixels, above which a press is an orbit and not a click. */
 const CLICK_SLOP_PX = 6
@@ -152,11 +192,19 @@ export class AnatomyViewer {
   #structureList: HTMLElement | null = null
   #controls: OrbitControls | null = null
   #environment: Texture | null = null
-  #plinth: Mesh | null = null
   #contactShadow: Mesh | null = null
 
   #model: LoadedOrganModel | null = null
   #materials: MaterialRecord[] = []
+  /**
+   * Materials the organ tint has already been blended into.
+   *
+   * The asset manager keeps three models resident, so revisiting an organ hands
+   * back the same material objects. Without this the tint would compound on
+   * every visit and the heart would walk towards its own accent colour one
+   * navigation at a time.
+   */
+  readonly #tinted = new WeakSet<Material>()
   #mode: ViewerMode
   #layer: ViewerLayer = 'solid'
   #selectedId: StructureId | null = null
@@ -254,13 +302,13 @@ export class AnatomyViewer {
     this.#assets.retain(organ.modelUrl)
 
     this.#modelGroup.add(model.root)
-    this.#collectMaterials(model.root)
+    this.#collectMaterials(model.root, organ.accentColor)
     this.#applyLayerToMaterials()
 
     // Hotspots snap against this organ's geometry, so they must be rebuilt for
     // every load — an anchor is only meaningful in the model it was authored
     // against (docs/architecture.md §5.4 rule 1).
-    this.#hotspots.attach(organ.structures, model.root, organ.accentColor)
+    this.#hotspots.attach(organ.structures, model.root)
     this.#selectedId = null
     this.#isolatedId = null
     this.#hotspots.setSolo(null)
@@ -351,8 +399,9 @@ export class AnatomyViewer {
    * Reduced semantics (docs/architecture.md §5.3).
    *
    * With single-mesh models there is no second object to hide, so this dims every
-   * other marker, fades the organ to 35 %, dims the plinth, and flies the camera
-   * in. It does **not** hide geometry, and says so through `capability:degraded`.
+   * other marker, fades the organ to 35 %, dims its contact shadow, and flies the
+   * camera in. It does **not** hide geometry, and says so through
+   * `capability:degraded`.
    * With per-structure meshes it hides every other mesh instead.
    */
   isolateStructure(id: StructureId | null): void {
@@ -690,14 +739,12 @@ export class AnatomyViewer {
     this.#materials = []
     this.#assets.dispose()
 
-    if (this.#plinth !== null) disposeObject3D(this.#plinth)
     if (this.#contactShadow !== null) {
       const material = this.#contactShadow.material
       if (!Array.isArray(material)) disposeMaterial(material)
       this.#contactShadow.geometry.dispose()
       this.#contactShadow.removeFromParent()
     }
-    this.#plinth = null
     this.#contactShadow = null
 
     this.#environment?.dispose()
@@ -736,6 +783,7 @@ export class AnatomyViewer {
     const renderer =
       deps.createRenderer?.(canvas) ??
       createDefaultRenderer(canvas, this.#options.lowPower === true)
+    configureColorPipeline(renderer)
     this.#renderer = renderer
 
     this.#scene.add(this.#modelGroup, this.#hotspots.group)
@@ -809,44 +857,55 @@ export class AnatomyViewer {
     }
   }
 
+  /**
+   * The plinth: one gradient-textured plane and nothing else.
+   *
+   * Hidden until a model has been measured. The canvas is transparent over a
+   * white card, so a shadow drawn before there is anything to cast it is just a
+   * grey lens laid over the paper — which is exactly what the previous hard disc
+   * looked like on an empty stage.
+   */
   #buildGround(): void {
-    const plinth = new Mesh(
-      new CircleGeometry(FIT_SIZE * 0.78, 64),
-      new MeshStandardMaterial({
-        color: new Color(0x1a1d23),
-        roughness: 0.95,
-        metalness: 0,
+    const shadowTexture = createContactShadowTexture()
+    if (shadowTexture === null) return
+
+    const shadow = new Mesh(
+      new PlaneGeometry(1, 1),
+      new MeshBasicMaterial({
+        map: shadowTexture,
         transparent: true,
-        opacity: 0.55,
+        opacity: CONTACT_SHADOW_OPACITY,
+        depthWrite: false,
+        // The shadow is a drawn approximation, not a lit surface. Running it
+        // through ACES would roll off the darkness it exists to provide.
+        toneMapped: false,
       }),
     )
-    plinth.rotation.x = -Math.PI / 2
-    plinth.renderOrder = -2
-    this.#scene.add(plinth)
-    this.#plinth = plinth
-
-    const shadowTexture = createContactShadowTexture()
-    if (shadowTexture !== null) {
-      const shadow = new Mesh(
-        new CircleGeometry(FIT_SIZE * 0.6, 48),
-        new MeshBasicMaterial({
-          map: shadowTexture,
-          transparent: true,
-          opacity: 0.55,
-          depthWrite: false,
-        }),
-      )
-      shadow.rotation.x = -Math.PI / 2
-      shadow.renderOrder = -1
-      this.#scene.add(shadow)
-      this.#contactShadow = shadow
-    }
+    shadow.name = CONTACT_SHADOW_NAME
+    shadow.rotation.x = -Math.PI / 2
+    shadow.renderOrder = -1
+    shadow.visible = false
+    this.#scene.add(shadow)
+    this.#contactShadow = shadow
   }
 
+  /**
+   * Fits the contact shadow to the organ standing on it.
+   *
+   * The plane is rotated flat, so its local x and y are world x and z — scaling
+   * them independently is what turns one radial gradient into an ellipse under a
+   * kidney and a rounder pool under a brain.
+   */
   #positionGround(model: LoadedOrganModel): void {
-    const floor = new Box3().setFromObject(model.root).min.y
-    if (this.#plinth !== null) this.#plinth.position.y = floor - 0.02
-    if (this.#contactShadow !== null) this.#contactShadow.position.y = floor - 0.01
+    const shadow = this.#contactShadow
+    if (shadow === null) return
+
+    const bounds = new Box3().setFromObject(model.root)
+    const size = bounds.getSize(new Vector3())
+
+    shadow.scale.set(size.x * CONTACT_SHADOW_FOOTPRINT, size.z * CONTACT_SHADOW_FOOTPRINT, 1)
+    shadow.position.y = bounds.min.y - 0.01
+    shadow.visible = true
   }
 
   #mountStructureList(): void {
@@ -1051,7 +1110,15 @@ export class AnatomyViewer {
     this.#emitter.emit('author:point', { position })
   }
 
-  #collectMaterials(root: Object3D): void {
+  /**
+   * Records the baseline every later material change is measured against, and
+   * applies the organ's accent tint before taking it.
+   *
+   * Order matters. The tint has to be inside the baseline, because a simulation
+   * clearing its own tint restores to `record.color` — take the baseline first
+   * and the organ would lose its colour the moment a simulation step ended.
+   */
+  #collectMaterials(root: Object3D, accentColor: string): void {
     const records: MaterialRecord[] = []
     const seen = new Set<Material>()
 
@@ -1062,6 +1129,7 @@ export class AnatomyViewer {
         if (seen.has(material)) continue
         seen.add(material)
         const typed = material as MaterialRecord['material']
+        this.#applyOrganTint(typed, accentColor)
         records.push({
           material: typed,
           color: typed.color?.clone() ?? null,
@@ -1074,6 +1142,27 @@ export class AnatomyViewer {
     })
 
     this.#materials = records
+  }
+
+  /**
+   * Blends a muted version of `organs.accent` into the baked colour map, once.
+   *
+   * Blended rather than applied as a flat colour: the map carries every
+   * anatomical cue these single-mesh models have, and repainting it throws that
+   * away for a wash of brand colour (docs/project-context.md §2.2).
+   */
+  #applyOrganTint(material: MaterialRecord['material'], accentColor: string): void {
+    if (material.color === undefined) return
+    if (this.#tinted.has(material)) return
+    this.#tinted.add(material)
+
+    const tint = new Color(accentColor)
+    const hsl = { h: 0, s: 0, l: 0 }
+    tint.getHSL(hsl)
+    tint.setHSL(hsl.h, hsl.s * ORGAN_TINT_SATURATION, hsl.l)
+
+    material.color.lerp(tint, ORGAN_TINT_STRENGTH)
+    material.needsUpdate = true
   }
 
   #applyLayerToMaterials(): void {
@@ -1097,13 +1186,9 @@ export class AnatomyViewer {
   }
 
   #setGroundOpacity(scale: number): void {
-    const plinth = this.#plinth?.material
-    if (plinth !== undefined && !Array.isArray(plinth)) {
-      plinth.opacity = 0.55 * scale
-    }
     const shadow = this.#contactShadow?.material
     if (shadow !== undefined && !Array.isArray(shadow)) {
-      shadow.opacity = 0.55 * scale
+      shadow.opacity = CONTACT_SHADOW_OPACITY * scale
     }
   }
 
@@ -1225,7 +1310,7 @@ export class AnatomyViewer {
         y: destination.y,
         z: destination.z,
         duration: CAMERA_TWEEN_S,
-        ease: 'power2.inOut',
+        ease: 'power2.out',
         onUpdate: () => this.#requestRender(),
       }),
       gsap.to(controls.target, {
@@ -1233,7 +1318,7 @@ export class AnatomyViewer {
         y: target.y,
         z: target.z,
         duration: CAMERA_TWEEN_S,
-        ease: 'power2.inOut',
+        ease: 'power2.out',
       }),
     ])
 
@@ -1253,13 +1338,29 @@ function createDefaultRenderer(canvas: HTMLCanvasElement, lowPower: boolean): We
   // Capped at 2: beyond that the pixel count doubles for a difference nobody can
   // see on a 150k-triangle model, and phones are exactly where that hurts.
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, lowPower ? 1 : 2))
+  return renderer
+}
+
+/**
+ * The colour pipeline, applied to whichever renderer the viewer ended up with
+ * rather than only to the one it built.
+ *
+ * These four settings are not a property of *how* the context was created; they
+ * are the viewer's contract for what the scene looks like once it is
+ * (docs/handovers/15-Atelier-Visual-Language.md phase 6). Setting them here
+ * means a host — or the test suite — that supplies its own renderer gets the
+ * same image, and that they can be asserted at all.
+ */
+function configureColorPipeline(renderer: WebGLRenderer): void {
   renderer.outputColorSpace = SRGBColorSpace
   renderer.toneMapping = ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1
+  // Slightly hot on purpose. ACES rolls the highlights off hard, and at 1.0 a
+  // wet-looking tissue material renders a shade duller than it was authored;
+  // 1.05 puts the specular back without clipping it.
+  renderer.toneMappingExposure = 1.05
   // Local clipping, so `setCrossSection` cuts only the organ's materials and
-  // leaves the plinth and markers alone.
+  // leaves the contact shadow and the markers alone.
   renderer.localClippingEnabled = true
-  return renderer
 }
 
 /**
@@ -1286,6 +1387,14 @@ function buildRoomScene(): Scene {
   return room
 }
 
+/**
+ * The contact shadow itself: a warm radial falloff that reaches zero alpha well
+ * inside the quad, so the ellipse has no edge to catch the eye.
+ *
+ * Warm rather than neutral black — `--color-ink`, like every other shadow in the
+ * atelier palette. A neutral shadow over warm paper reads as a grey filter over
+ * the card rather than as an absence of light under the organ.
+ */
 function createContactShadowTexture(): Texture | null {
   if (typeof document === 'undefined') return null
   const canvas = document.createElement('canvas')
@@ -1294,14 +1403,22 @@ function createContactShadowTexture(): Texture | null {
   const context = canvas.getContext('2d')
   if (context === null) return null
 
+  const { r, g, b } = new Color(SHADOW_INK)
+  const ink = (alpha: number): string =>
+    `rgba(${String(Math.round(r * 255))},${String(Math.round(g * 255))},${String(
+      Math.round(b * 255),
+    )},${String(alpha)})`
+
   const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64)
-  gradient.addColorStop(0, 'rgba(0,0,0,0.55)')
-  gradient.addColorStop(0.6, 'rgba(0,0,0,0.22)')
-  gradient.addColorStop(1, 'rgba(0,0,0,0)')
+  gradient.addColorStop(0, ink(0.34))
+  gradient.addColorStop(0.45, ink(0.16))
+  gradient.addColorStop(0.75, ink(0.04))
+  gradient.addColorStop(1, ink(0))
   context.fillStyle = gradient
   context.fillRect(0, 0, 128, 128)
 
   const texture = new Texture(canvas)
+  texture.colorSpace = SRGBColorSpace
   texture.needsUpdate = true
   return texture
 }

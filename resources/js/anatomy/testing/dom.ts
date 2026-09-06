@@ -8,27 +8,65 @@
  * pretending to be a GPU.
  */
 
-type ContextFactory = (contextId: string) => unknown
+type ContextFactory = (this: HTMLCanvasElement, contextId: string) => unknown
 
 let originalGetContext: ContextFactory | null = null
 
+export interface CanvasStubOptions {
+  readonly webgl2?: boolean
+  /**
+   * Off by default, because the generated marker and shadow textures are
+   * *supposed* to degrade to flat colour where 2D canvas is unavailable, and
+   * that is the branch most of the suite should be exercising. Turn it on for a
+   * test that needs the textures to actually exist.
+   */
+  readonly twoD?: boolean
+}
+
 /**
  * Replaces jsdom's `getContext`, which throws a "not implemented" notice on every
- * call. Returns null for `2d` — the viewer's generated marker and shadow textures
- * degrade to flat colour without one, which is the branch worth exercising here —
- * and a minimal probe object for `webgl2` when `webgl2` is set.
+ * call. Returns a minimal probe object for `webgl2` when `webgl2` is set, a
+ * drawing-shaped stub for `2d` when `twoD` is set, and null otherwise.
  */
-export function stubCanvasContext(options: { webgl2?: boolean } = {}): void {
-  installContextFactory((contextId) =>
-    contextId === 'webgl2' && options.webgl2 === true
-      ? { getExtension: () => ({ loseContext: () => undefined }) }
-      : null,
-  )
+export function stubCanvasContext(options: CanvasStubOptions = {}): void {
+  installContextFactory(function stub(this: HTMLCanvasElement, contextId: string) {
+    if (contextId === 'webgl2') {
+      return options.webgl2 === true
+        ? { getExtension: () => ({ loseContext: () => undefined }) }
+        : null
+    }
+    if (contextId === '2d' && options.twoD === true) return createDrawingStub(this)
+    return null
+  })
+}
+
+/**
+ * Enough of `CanvasRenderingContext2D` for the four generated textures.
+ *
+ * Deliberately records nothing: what the gradients look like is not something a
+ * unit test can judge, and the reason to have this at all is that the code paths
+ * *around* the drawing — texture creation, colour space, and above all disposal —
+ * cannot run without a context to return.
+ */
+function createDrawingStub(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const gradient = { addColorStop: (): void => undefined }
+  const context = {
+    canvas,
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 0,
+    createRadialGradient: () => gradient,
+    fillRect: (): void => undefined,
+    beginPath: (): void => undefined,
+    arc: (): void => undefined,
+    stroke: (): void => undefined,
+  }
+  return context as unknown as CanvasRenderingContext2D
 }
 
 /** Makes `probeWebGL()` succeed. */
-export function stubWebGLSupport(): void {
-  stubCanvasContext({ webgl2: true })
+export function stubWebGLSupport(options: Omit<CanvasStubOptions, 'webgl2'> = {}): void {
+  stubCanvasContext({ ...options, webgl2: true })
 }
 
 /** Makes `probeWebGL()` fail, as it does where WebGL is blocklisted or switched off. */

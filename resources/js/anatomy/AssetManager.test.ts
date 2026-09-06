@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three'
+import {
+  Box3,
+  BoxGeometry,
+  Group,
+  Mesh,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  SphereGeometry,
+  Vector3,
+} from 'three'
 import { AnatomyAssetManager, countTriangles, normaliseIntoFitCube } from './AssetManager'
 import { FIT_SIZE } from './constants'
 import { createFixtureLoader, createFixtureModel } from './testing/fixtures'
@@ -161,6 +170,72 @@ describe('AnatomyAssetManager', () => {
 
     expect(material.map?.anisotropy).toBe(8)
     expect(material.roughnessMap?.anisotropy).toBe(8)
+  })
+
+  it('re-homes the baked material onto a physical one so tissue can look wet', async () => {
+    // Handover 15 phase 6. The models ship a matte-preview roughness map and no
+    // clearcoat, which against the room environment reads as dry plastic.
+    const loader = createFixtureLoader()
+    manager = new AnatomyAssetManager({ createLoader: () => loader })
+
+    const model = await manager.load('/models/heart.glb')
+    const material = (model.root.children[0] as Mesh<SphereGeometry, MeshPhysicalMaterial>).material
+
+    expect(material).toBeInstanceOf(MeshPhysicalMaterial)
+    expect(material.roughness).toBeCloseTo(0.45, 5)
+    expect(material.clearcoat).toBeCloseTo(0.25, 5)
+    expect(material.clearcoatRoughness).toBeCloseTo(0.4, 5)
+  })
+
+  it('keeps the PHYSICAL define, without which the clearcoat would compile away', async () => {
+    // `MeshStandardMaterial.copy` overwrites `defines` with `{ STANDARD: '' }`.
+    // Miss that and the material silently renders as a standard one: no error,
+    // no clearcoat, and nothing to see except a slightly duller organ.
+    const loader = createFixtureLoader()
+    manager = new AnatomyAssetManager({ createLoader: () => loader })
+
+    const model = await manager.load('/models/heart.glb')
+    const material = (model.root.children[0] as Mesh<SphereGeometry, MeshPhysicalMaterial>).material
+
+    expect(material.defines).toMatchObject({ STANDARD: '', PHYSICAL: '' })
+  })
+
+  it('carries the baked maps across to the physical material', async () => {
+    // The maps are the only anatomical information these single-mesh models
+    // have (docs/project-context.md §2.2). Losing them in the upgrade would
+    // leave a correctly-lit blank shell.
+    const loader = createFixtureLoader()
+    manager = new AnatomyAssetManager({ createLoader: () => loader })
+    const before = loader.models
+
+    const model = await manager.load('/models/heart.glb')
+    const material = (model.root.children[0] as Mesh<SphereGeometry, MeshPhysicalMaterial>).material
+
+    expect(before).toHaveLength(1)
+    expect(material.map).not.toBeNull()
+    expect(material.map?.isTexture).toBe(true)
+  })
+
+  it('leaves two primitives that shared a material sharing one', async () => {
+    // glTF shares a material between primitives far more often than a geometry.
+    // Upgrading per mesh instead of per material would double the shader
+    // programs and the texture bindings for no visible difference.
+    const loader = createFixtureLoader({
+      createModel: () => {
+        const model = createFixtureModel()
+        const first = model.children[0] as Mesh<SphereGeometry, MeshStandardMaterial>
+        const second = new Mesh(new SphereGeometry(1, 8, 6), first.material)
+        model.add(second)
+        return model
+      },
+    })
+    manager = new AnatomyAssetManager({ createLoader: () => loader })
+
+    const model = await manager.load('/models/heart.glb')
+    const [first, second] = model.root.children as Mesh<SphereGeometry, MeshPhysicalMaterial>[]
+
+    expect(first!.material).toBeInstanceOf(MeshPhysicalMaterial)
+    expect(second!.material).toBe(first!.material)
   })
 
   it('reports load progress', async () => {

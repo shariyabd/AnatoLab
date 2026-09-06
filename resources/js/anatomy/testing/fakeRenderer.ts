@@ -50,6 +50,7 @@ export class FakeWebGLRenderer {
   localClippingEnabled = false
   contextLost = false
   disposed = false
+  scene: Scene | null = null
 
   readonly #geometries = new Set<BufferGeometry>()
   readonly #textures = new Set<Texture>()
@@ -65,6 +66,10 @@ export class FakeWebGLRenderer {
   clear(): void {}
 
   render(scene: Scene, _camera: Camera): void {
+    // Kept so a test can inspect what the viewer actually put in front of the
+    // camera — the scene graph is private to the viewer, and asserting on it
+    // through the thing that draws it is the only honest way in.
+    this.scene = scene
     this.info.render.calls += 1
     this.#registerTexture(scene.environment)
     scene.traverse((object) => this.#registerObject(object))

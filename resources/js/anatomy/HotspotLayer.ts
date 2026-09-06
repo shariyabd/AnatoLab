@@ -43,6 +43,14 @@ import {
   type PerspectiveCamera,
 } from 'three'
 import { HOTSPOT_SURFACE_OFFSET } from './constants'
+import {
+  MARKER_ACTIVE,
+  MARKER_FLASH_CORRECT,
+  MARKER_FLASH_WRONG,
+  MARKER_RESTING,
+  MARKER_RING,
+  SHADOW_INK,
+} from './palette'
 import type { StructureDto, StructureId } from './types'
 
 /**
@@ -60,8 +68,28 @@ const DIRECTION_CONE_COS = 0.5
  * docs/architecture.md §5.4 rule 6 requires that it does. Billboarded meshes on
  * a geometry this layer allocates and frees cost one line in `update()`.
  */
-const MARKER_SCREEN_FRACTION = 0.038
-const RING_SCREEN_FRACTION = 0.062
+const MARKER_SCREEN_FRACTION = 0.026
+
+/**
+ * The halo quad, as a multiple of the dot quad.
+ *
+ * Handover 15 phase 4 asks for a 2 px white ring around the dot and a soft drop
+ * shadow behind it, at every state. Both live in one texture, so the geometry of
+ * all three is fixed by these four numbers together; the arithmetic that ties
+ * them is written out at `createHaloTexture`. Changing one without redoing that
+ * sum puts a gap between the dot and its ring.
+ */
+const HALO_RATIO = 1.71
+
+/**
+ * The selected or highlighted marker, and how long it takes to get there.
+ *
+ * One ease-out, then it stops. Deliberately *not* a loop: a marker that pulses
+ * for ever means every frame is a changed frame, which is the render-on-demand
+ * loop's whole budget spent on decoration (docs/architecture.md §15.1).
+ */
+const ACTIVE_SCALE = 1.35
+const ACTIVE_SCALE_IN_MS = 400
 
 /** Below this opacity a marker is considered on the far side and unpickable. */
 const PICKABLE_OPACITY = 0.35
@@ -73,12 +101,14 @@ type MarkerMesh = Mesh<PlaneGeometry, MeshBasicMaterial>
 interface Marker {
   readonly structure: StructureDto
   readonly dot: MarkerMesh
-  readonly ring: MarkerMesh
+  /** White ring plus drop shadow, one quad behind the dot. */
+  readonly halo: MarkerMesh
   /** Post-snap world position, in FIT_SIZE pivot space. */
   readonly position: Vector3
   /** Outward surface normal at the snapped vertex; drives the facing test. */
   readonly normal: Vector3
-  readonly baseColor: Color
+  /** Wall-clock ms this marker became active; 0 when it is at rest. */
+  activeSince: number
   /** Wall-clock ms at which a quiz flash ends; 0 when not flashing. */
   flashUntil: number
   flashCorrect: boolean
@@ -107,7 +137,7 @@ export class HotspotLayer {
   /** One quad, shared by every marker and owned here. See MARKER_SCREEN_FRACTION. */
   readonly #quad = new PlaneGeometry(1, 1)
   readonly #dotTexture: Texture | null
-  readonly #ringTexture: Texture | null
+  readonly #haloTexture: Texture | null
   #indexList: HTMLUListElement | null = null
   #indexContainer: HTMLElement | null = null
   #selectedId: StructureId | null = null
@@ -130,12 +160,8 @@ export class HotspotLayer {
     // occluded by it. Depth ordering would fight the facing test, which is the
     // thing that actually decides visibility.
     this.group.renderOrder = 10
-    this.#dotTexture = createRadialTexture([
-      [0, 'rgba(255,255,255,1)'],
-      [0.45, 'rgba(255,255,255,0.95)'],
-      [1, 'rgba(255,255,255,0)'],
-    ])
-    this.#ringTexture = createRingTexture()
+    this.#dotTexture = createDotTexture()
+    this.#haloTexture = createHaloTexture()
   }
 
   get structures(): readonly StructureDto[] {
@@ -149,8 +175,16 @@ export class HotspotLayer {
   /**
    * Builds one marker per structure, snapping each authored coordinate onto the
    * organ's surface. Replaces whatever was attached before.
+   *
+   * Markers take no colour from the organ or the structure. A marker is canvas
+   * chrome: it has to be legible against pale lung and dark liver alike, and it
+   * has to say which of two states it is in — which a per-structure identity
+   * colour cannot do, and which the audited red-dots-on-a-red-heart could not do
+   * either. `--color-hotspot` at rest, `--color-hotspot-live` when active
+   * (handover 15 phase 4). `StructureDto.markerColor` stays in the contract and
+   * is still what the structure list and the callout key off.
    */
-  attach(structures: readonly StructureDto[], organ: Object3D, accentColor: string): void {
+  attach(structures: readonly StructureDto[], organ: Object3D): void {
     this.clear()
 
     const snapped = snapAllToSurface(structures, organ)
@@ -159,24 +193,22 @@ export class HotspotLayer {
       const resolved = snapped.get(structure.id)
       if (resolved === undefined) continue
 
-      const color = new Color(structure.markerColor ?? accentColor)
-
-      const dot = this.#createMarkerMesh(this.#dotTexture, color, 1)
+      const dot = this.#createMarkerMesh(this.#dotTexture, new Color(MARKER_RESTING))
       dot.position.copy(resolved.position)
       dot.renderOrder = 11
 
-      const ring = this.#createMarkerMesh(this.#ringTexture, color, 0)
-      ring.position.copy(resolved.position)
-      ring.renderOrder = 10
+      const halo = this.#createMarkerMesh(this.#haloTexture, new Color(MARKER_RING))
+      halo.position.copy(resolved.position)
+      halo.renderOrder = 10
 
-      this.group.add(ring, dot)
+      this.group.add(halo, dot)
       this.#markers.set(structure.id, {
         structure,
         dot,
-        ring,
+        halo,
         position: resolved.position,
         normal: resolved.normal,
-        baseColor: color,
+        activeSince: 0,
         flashUntil: 0,
         flashCorrect: false,
       })
@@ -198,17 +230,19 @@ export class HotspotLayer {
     this.#interactive = interactive
     for (const marker of this.#markers.values()) {
       marker.dot.visible = interactive
-      marker.ring.visible = interactive
+      marker.halo.visible = interactive
     }
   }
 
   setSelected(id: StructureId | null): void {
     this.#selectedId = id
+    this.#stampActive()
     this.#syncIndexPressedState()
   }
 
   setHighlighted(id: StructureId | null): void {
     this.#highlightedId = id
+    this.#stampActive()
   }
 
   /** Isolation: everything except `id` dims. Null restores all markers. */
@@ -235,12 +269,22 @@ export class HotspotLayer {
     return duration
   }
 
-  /** True while any marker is mid-flash, so the render loop stays awake. */
+  /**
+   * True while a flash or an activation scale-in is still running, so the render
+   * loop stays awake for exactly as long as something is moving and not one
+   * frame longer.
+   */
   get isAnimating(): boolean {
     if (this.#pulseRate > 0 && this.#options.reducedMotion !== true) return this.#markers.size > 0
+
     const current = now()
+    const easing = this.#options.reducedMotion !== true
+
     for (const marker of this.#markers.values()) {
       if (marker.flashUntil > current) return true
+      if (easing && marker.activeSince > 0 && current - marker.activeSince < ACTIVE_SCALE_IN_MS) {
+        return true
+      }
     }
     return false
   }
@@ -275,23 +319,21 @@ export class HotspotLayer {
       const dimmed = this.#soloId !== null && this.#soloId !== marker.structure.id
       if (dimmed) opacity *= 0.15
 
-      const selected = marker.structure.id === this.#selectedId
-      const highlighted = marker.structure.id === this.#highlightedId
+      const active = marker.activeSince > 0
       const flashing = marker.flashUntil > current
 
       const material = marker.dot.material
       material.opacity = opacity
-      material.color.copy(marker.baseColor)
+      material.color.set(active ? MARKER_ACTIVE : MARKER_RESTING)
 
       const distance = cameraPosition.distanceTo(marker.position)
       const screenUnit = unitsPerScreenHeight * distance
 
-      let scale = MARKER_SCREEN_FRACTION
-      if (selected || highlighted) scale *= 1.35
+      let scale = MARKER_SCREEN_FRACTION * this.#activeScaleOf(marker, current)
 
       if (flashing) {
         const remaining = (marker.flashUntil - current) / FLASH_MS
-        material.color.set(marker.flashCorrect ? 0x35c46a : 0xe2564a)
+        material.color.set(marker.flashCorrect ? MARKER_FLASH_CORRECT : MARKER_FLASH_WRONG)
         scale *= 1 + 0.35 * remaining
       } else if (!dimmed && this.#options.reducedMotion !== true && this.#pulseRate > 0) {
         // A slow breath so a static screenshot and a live screen look the same,
@@ -302,14 +344,49 @@ export class HotspotLayer {
       marker.dot.scale.setScalar(scale * screenUnit)
       marker.dot.quaternion.copy(camera.quaternion)
 
-      const ringMaterial = marker.ring.material
-      const ringVisible = selected || highlighted || flashing
-      ringMaterial.opacity = ringVisible ? opacity * 0.85 : 0
-      ringMaterial.color.copy(flashing ? material.color : marker.baseColor)
-      marker.ring.scale.setScalar(
-        scale * (RING_SCREEN_FRACTION / MARKER_SCREEN_FRACTION) * screenUnit,
-      )
-      marker.ring.quaternion.copy(camera.quaternion)
+      // The halo carries the white ring and the drop shadow, and it is white at
+      // every state — it is what makes an orange dot legible on orange tissue,
+      // so tinting it with the state colour would undo its only job.
+      marker.halo.material.opacity = opacity
+      marker.halo.scale.setScalar(scale * HALO_RATIO * screenUnit)
+      marker.halo.quaternion.copy(camera.quaternion)
+    }
+  }
+
+  /**
+   * Where a marker is in its one-shot activation ease.
+   *
+   * Reduced motion lands on the end state immediately: the size difference is
+   * the signal, the 400 ms getting there is not.
+   */
+  #activeScaleOf(marker: Marker, current: number): number {
+    if (marker.activeSince === 0) return 1
+    if (this.#options.reducedMotion === true) return ACTIVE_SCALE
+
+    const progress = Math.min(1, (current - marker.activeSince) / ACTIVE_SCALE_IN_MS)
+    return 1 + (ACTIVE_SCALE - 1) * easeOutCubic(progress)
+  }
+
+  /**
+   * Starts the activation ease on whichever markers just became active, and
+   * clears it on the rest.
+   *
+   * Stamped here rather than in `update()` so the ease is timed from the
+   * selection, not from the first frame that happens to follow it — and so a
+   * marker that is already active does not restart when the *other* of selection
+   * and highlight lands on it.
+   */
+  #stampActive(): void {
+    const current = now()
+    for (const marker of this.#markers.values()) {
+      const active =
+        marker.structure.id === this.#selectedId || marker.structure.id === this.#highlightedId
+
+      if (!active) {
+        marker.activeSince = 0
+      } else if (marker.activeSince === 0) {
+        marker.activeSince = current
+      }
     }
   }
 
@@ -386,12 +463,12 @@ export class HotspotLayer {
 
   clear(): void {
     for (const marker of this.#markers.values()) {
-      this.group.remove(marker.dot, marker.ring)
+      this.group.remove(marker.dot, marker.halo)
       // `material.dispose()`, not `disposeMaterial()`: the maps are shared across
       // every marker and owned by this layer, so they are freed once in
       // dispose(), not once per marker here.
       marker.dot.material.dispose()
-      marker.ring.material.dispose()
+      marker.halo.material.dispose()
     }
     this.#markers.clear()
     this.#selectedId = null
@@ -409,20 +486,20 @@ export class HotspotLayer {
     // freed here rather than in clear().
     this.#quad.dispose()
     this.#dotTexture?.dispose()
-    this.#ringTexture?.dispose()
+    this.#haloTexture?.dispose()
     this.#indexList?.remove()
     this.#indexList = null
     this.#indexContainer = null
     this.group.removeFromParent()
   }
 
-  #createMarkerMesh(map: Texture | null, color: Color, opacity: number): MarkerMesh {
+  #createMarkerMesh(map: Texture | null, color: Color): MarkerMesh {
     const mesh = new Mesh(
       this.#quad,
       new MeshBasicMaterial({
         map,
         color,
-        opacity,
+        opacity: 1,
         transparent: true,
         // Markers are UI drawn over the organ. Occlusion is decided by the facing
         // test in update(), not by the depth buffer — that is the whole point of
@@ -600,36 +677,111 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
   return t * t * (3 - 2 * t)
 }
 
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3
+}
+
 function now(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now()
 }
 
-/**
- * Marker art is generated rather than shipped: two small canvases beat a sprite
- * sheet request, and the colour comes from server data at runtime anyway.
- * Returns null where 2D canvas is unavailable (jsdom without node-canvas), in
- * which case the sprite falls back to a flat coloured quad.
+/*
+ | Marker art is generated rather than shipped: two small canvases beat a sprite
+ | sheet request, and each is drawn white so the state colour can be applied as a
+ | material tint at runtime. Both builders return null where 2D canvas is
+ | unavailable (jsdom without node-canvas), in which case the quad falls back to
+ | a flat colour.
  */
-function createRadialTexture(stops: readonly [number, string][]): Texture | null {
-  const context = createCanvasContext(64)
+
+const TEXTURE_SIZE = 64
+const TEXTURE_CENTRE = TEXTURE_SIZE / 2
+
+/**
+ * The filled dot. Solid to 90 % of its radius, then one texel of falloff so the
+ * edge is antialiased at any zoom rather than stair-stepped.
+ */
+const DOT_RADIUS = 26
+
+/**
+ * The white ring and the drop shadow, in the halo texture's own pixels.
+ *
+ * These four numbers are one sum, and it is the reason `HALO_RATIO` is 1.71
+ * rather than a round number. Working in screen pixels on a 600 px-tall canvas:
+ *
+ *   dot quad          0.026 × 600            = 15.6 px
+ *   dot diameter      15.6 × (2 × 26 / 64)   = 12.7 px, so a radius of 6.34 px
+ *   halo quad         15.6 × 1.71            = 26.7 px, so a half-width of 13.3 px
+ *   ring outer edge   (17.5 + 4.7 / 2) / 32 × 13.3 = 8.25 px
+ *   ring inner edge   (17.5 - 4.7 / 2) / 32 × 13.3 = 6.31 px  ← meets the dot
+ *   ring width                                      = 1.94 px ← handover's 2 px
+ *
+ * The shadow then has the remaining 13.3 − 8.25 px of the quad to fade out in.
+ */
+const RING_RADIUS = 17.5
+const RING_WIDTH = 4.7
+const SHADOW_CENTRE_ALPHA = 0.34
+const SHADOW_DROP = 2
+
+function createDotTexture(): Texture | null {
+  const context = createCanvasContext(TEXTURE_SIZE)
   if (context === null) return null
 
-  const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32)
-  for (const [offset, color] of stops) gradient.addColorStop(offset, color)
+  const gradient = context.createRadialGradient(
+    TEXTURE_CENTRE,
+    TEXTURE_CENTRE,
+    0,
+    TEXTURE_CENTRE,
+    TEXTURE_CENTRE,
+    DOT_RADIUS,
+  )
+  gradient.addColorStop(0, 'rgba(255,255,255,1)')
+  gradient.addColorStop(0.9, 'rgba(255,255,255,1)')
+  gradient.addColorStop(1, 'rgba(255,255,255,0)')
   context.fillStyle = gradient
-  context.fillRect(0, 0, 64, 64)
+  context.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE)
 
   return canvasToTexture(context)
 }
 
-function createRingTexture(): Texture | null {
-  const context = createCanvasContext(64)
+/**
+ * Drop shadow first, white ring over it, both in one texture.
+ *
+ * One quad rather than two because the material tint has to stay white for both:
+ * the shadow is drawn dark and the ring white, and multiplying either by white
+ * leaves it as drawn. Splitting them would cost a third draw call per marker for
+ * no visual difference.
+ *
+ * The shadow sits a couple of texels low, which is what makes the marker read as
+ * floating off the surface rather than painted onto it, and it is warm rather
+ * than neutral because every shadow in this palette is.
+ */
+function createHaloTexture(): Texture | null {
+  const context = createCanvasContext(TEXTURE_SIZE)
   if (context === null) return null
 
+  const gradient = context.createRadialGradient(
+    TEXTURE_CENTRE,
+    TEXTURE_CENTRE + SHADOW_DROP,
+    0,
+    TEXTURE_CENTRE,
+    TEXTURE_CENTRE + SHADOW_DROP,
+    TEXTURE_CENTRE,
+  )
+  const ink = new Color(SHADOW_INK)
+  const channels = `${String(Math.round(ink.r * 255))},${String(
+    Math.round(ink.g * 255),
+  )},${String(Math.round(ink.b * 255))}`
+
+  gradient.addColorStop(0, `rgba(${channels},${String(SHADOW_CENTRE_ALPHA)})`)
+  gradient.addColorStop(0.55, `rgba(${channels},${String(SHADOW_CENTRE_ALPHA * 0.4)})`)
+  gradient.addColorStop(1, `rgba(${channels},0)`)
+  context.fillStyle = gradient
+  context.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE)
+
   context.strokeStyle = 'rgba(255,255,255,1)'
-  context.lineWidth = 5
+  context.lineWidth = RING_WIDTH
   context.beginPath()
-  context.arc(32, 32, 26, 0, Math.PI * 2)
+  context.arc(TEXTURE_CENTRE, TEXTURE_CENTRE, RING_RADIUS, 0, Math.PI * 2)
   context.stroke()
 
   return canvasToTexture(context)
