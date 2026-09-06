@@ -55,7 +55,17 @@ final class PackedVector implements CastsAttributes
             return null;
         }
 
-        return array_values(array_map(static fn (mixed $component): float => (float) $component, $unpacked));
+        // `array_values` and nothing else. `unpack('g*')` already yields PHP
+        // floats in order — it only needs re-indexing from 1 to 0 — so mapping
+        // a `(float)` cast over it allocated a second array and made 1,536
+        // closure calls per chunk to produce a value identical to its input.
+        // MySqlVectorStore reads one of these for every row it scores, so that
+        // was ~150,000 redundant calls per search and about a third of the
+        // cast's cost (docs/architecture.md §8.1's 50 ms budget).
+        /** @var list<float> $components */
+        $components = array_values($unpacked);
+
+        return $components;
     }
 
     /**
