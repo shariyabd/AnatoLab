@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "status": "generated-fixture",
+  "generatedAt": "2026-09-06T14:51:59.294Z",
+  "generator": "scripts/make-structure-fixture.mjs",
+  "fitSize": 3.8,
+  "budgets": {
+    "maxModelBytes": 2097152,
+    "maxTriangles": 150000
+  },
+  "models": [
+    {
+      "organSlug": "heart",
+      "fileName": "heart-per-structure.glb",
+      "modelPath": "tests/Fixtures/models/heart-per-structure.glb",
+      "modelFormat": "glb",
+      "bytes": 42452,
+      "triangles": 1728,
+      "rootNode": "heart",
+      "structureNodes": [
+        "heart__right-atrium",
+        "heart__right-ventricle",
+        "heart__left-atrium",
+        "heart__left-ventricle",
+        "heart__aorta",
+        "heart__pulmonary-trunk",
+        "heart__superior-vena-cava",
+        "heart__mitral-valve",
+        "heart__apex"
+      ],
+      "anchors": {
+        "heart__right-atrium": [
+          -0.866176,
+          0.670588,
+          0.223529
+        ],
+        "heart__right-ventricle": [
+          -0.530882,
+          -0.726471,
+          0.670588
+        ],
+        "heart__left-atrium": [
+          0.977941,
+          0.726471,
+          -0.670588
+        ],
+        "heart__left-ventricle": [
+          0.866176,
+          -0.782353,
+          0.558824
+        ],
+        "heart__aorta": [
+          0.195588,
+          1.564706,
+          -0.391176
+        ],
+        "heart__pulmonary-trunk": [
+          -0.251471,
+          1.341176,
+          0.447059
+        ],
+        "heart__superior-vena-cava": [
+          -0.977941,
+          1.229412,
+          -0.055882
+        ],
+        "heart__mitral-valve": [
+          0.586765,
+          0.111765,
+          -0.055882
+        ],
+        "heart__apex": [
+          0.698529,
+          -1.564706,
+          0.279412
+        ]
+      },
+      "structureRadius": 0.335294,
+      "boundingBox": {
+        "min": [
+          -1.3132352971494405,
+          -1.9,
+          -1.0058823575610523
+        ],
+        "max": [
+          1.3132352971494405,
+          1.9,
+          1.005882357561052
+        ],
+        "size": [
+          2.626470594298881,
+          3.8,
+          2.011764715122104
+        ],
+        "centre": [
+          0,
+          0,
+          -1.1102230246251565e-16
+        ],
+        "longestAxis": 3.8
+      },
+      "normalisation": {
+        "fitSize": 3.8,
+        "ok": true,
+        "tolerance": 0.0076,
+        "longestAxis": 3.8,
+        "maxCentreOffset": 1.1102230246251565e-16,
+        "failures": []
+      },
+      "budget": {
+        "ok": true,
+        "bytesOk": true,
+        "trianglesOk": true,
+        "failures": []
+      }
+    }
+  ]
+}

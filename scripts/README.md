@@ -20,6 +20,8 @@ release step; it is not part of the request path.
 npm run models:encode -- <input.glb> --organ=heart --register-id=MDL-03
 npm run models:verify              # re-verify the shipped set
 npm run models:verify -- --release # additionally require the licence gate closed
+npm run models:fixture             # regenerate the per-structure test fixture
+npm run models:fixture:check       # fail if the committed fixture has drifted
 ```
 
 Or directly:
@@ -234,3 +236,54 @@ Two things this run does **not** establish: whether these models may legally shi
 (`docs/licence-log.md`), and whether decimating a single-mesh generative model to 147k
 triangles preserves anything a student should be taught from (`docs/asset-register.md` §2,
 flagged to F03).
+
+---
+
+## The per-structure test fixture
+
+`scripts/make-structure-fixture.mjs` writes `tests/Fixtures/models/heart-per-structure.glb`
+and a manifest beside it. It exists because handover 17 orders its branches A → B → C —
+B needs A's node names, C needs both — and that serialisation is real for shipped assets
+but entirely avoidable for tests. What B and C actually need from A is one GLB with
+per-structure nodes, and nothing requires it to be anatomically sourced.
+
+**It is not anatomy.** It is nine spheres at the heart's authored anchor positions, and
+nothing should ever present it to a student. What makes it useful is that everything
+around the geometry is real: the `<organ-slug>__<structure-slug>` node convention, the
+organ-root grouping, FIT_SIZE normalisation, the budget check, and the manifest shape
+Branch B seeds `model_object_name` from. Tests written against it keep passing when a
+licensed model replaces it.
+
+It also exercises no rights. `docs/asset-sources.md` §3.1 records that no source has been
+adopted; this generator takes from none, because the vertices are generated here.
+
+| Property        | Value                                                                              |
+| --------------- | ---------------------------------------------------------------------------------- |
+| Structure nodes | 9, matching `AnatomySeeder`'s heart slugs                                          |
+| Root node       | `heart`, with the pipeline's `anatolab_normalised_pivot` above it                  |
+| Size            | ~41 KB, 1,728 triangles — three orders of magnitude inside budget                  |
+| Normalisation   | longest axis exactly 3.8, centred on the origin                                    |
+| Materials       | one, shared across the organ                                                       |
+| Anchors         | in each node's translation, not baked into vertices — as a Blender export produces |
+
+Two things keep it honest. `--check` regenerates and compares bytes, so a hand-edited GLB
+or an un-rerun generator fails; and `resources/js/anatomy/testing/perStructureParity.test.ts`
+holds the in-memory Three.js fixture to the same manifest, so the Vitest half and the Pest
+half cannot describe different organs.
+
+### The naming convention
+
+`scripts/lib/structureNodes.mjs` is the one implementation of
+`<organ-slug>__<structure-slug>`, because it is the contract three branches join on: A
+names the nodes, B seeds from them, C raycasts against them. It refuses a slug rather than
+sanitising one — a slug that needs cleaning up is a slug that does not match the database
+row it addresses, and repairing it quietly produces a model whose nodes look right and
+join to nothing.
+
+`auditStructureNodes()` reports the three failures an export actually produces — a node
+named for a different organ, the same structure named twice, and a mesh node following no
+convention at all — together rather than one at a time, because each round trip is a trip
+back to Blender.
+
+The viewer does not import any of this. It receives `modelObjectName` in the DTO and hands
+it to `getObjectByName`, so the string stays opaque on that side and one copy is enough.

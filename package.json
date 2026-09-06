@@ -12,6 +12,8 @@
         "format:check": "prettier --check resources/js resources/css scripts",
         "models:encode": "node scripts/encode-model.mjs",
         "models:verify": "node scripts/verify-models.mjs",
+        "models:fixture": "node scripts/make-structure-fixture.mjs",
+        "models:fixture:check": "node scripts/make-structure-fixture.mjs --check",
         "bundle:verify": "node scripts/verify-bundle.mjs"
     },
     "devDependencies": {
