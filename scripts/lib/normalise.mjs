@@ -14,7 +14,15 @@
 
 import { measureBounds } from './measure.mjs'
 
-const PIVOT_NODE_NAME = 'anatolab_normalised_pivot'
+/**
+ * The single node normalisation wraps the scene in.
+ *
+ * Exported because `structureNodes.mjs` has to tell an organ root apart from
+ * this: structures hanging directly off the pivot are structures that were
+ * never grouped, and the two nodes are otherwise indistinguishable — both are
+ * unnamed-by-convention parents carrying no mesh.
+ */
+export const PIVOT_NODE_NAME = 'anatolab_normalised_pivot'
 
 /**
  * Scales and centres the default scene so its longest axis measures fitSize.

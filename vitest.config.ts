@@ -18,7 +18,10 @@ export default defineConfig({
     // jsdom rather than node: the viewer touches document and window even in
     // the unit tests that never create a WebGL context.
     environment: 'jsdom',
-    include: ['resources/js/**/*.test.ts'],
+    // Added by handover 17. `scripts/` was untested, and the per-structure node
+    // naming convention is the contract three branches join on — a regex that
+    // nothing checks is a regex that silently stops matching.
+    include: ['resources/js/**/*.test.ts', 'scripts/**/*.test.mjs'],
 
     // Added by Handover 15. Vitest stubs every CSS import to an empty string,
     // including `?raw`, so theme.contrast.test.ts cannot read the token layer

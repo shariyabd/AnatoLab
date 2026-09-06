@@ -29,6 +29,7 @@ import {
   hashFile,
   measureDocument,
 } from './lib/measure.mjs'
+import { describeStructureExport, diffStructureNodes } from './lib/structureNodes.mjs'
 
 const ASSET_REGISTER = 'docs/asset-register.md'
 
@@ -96,13 +97,64 @@ async function verifyModel(io, model, { fitSize, budgets, registerIds }) {
     `${label}: ${measured.triangles} triangles on disk, ${model.triangles} recorded in the manifest`,
   )
 
+  const structures = verifyStructureIdentity(document, model)
+
   return {
     label,
-    ok: budgetCheck.ok && normalisationCheck.ok,
+    ok: budgetCheck.ok && normalisationCheck.ok && structures.ok,
     bytes,
     triangles: measured.triangles,
     longestAxis: normalisationCheck.longestAxis,
+    structures: structures.count,
   }
+}
+
+/**
+ * Re-joins a per-structure model to the node list its manifest row promises —
+ * handover 17 Branch A's half of the contract with Branch B.
+ *
+ * `MeshIdentitySeeder` seeds `model_object_name` from `structureNodes` and
+ * nothing else, so a file that has quietly lost a node leaves the database
+ * claiming a mesh that is not there. That is the orphaning handover 17 calls
+ * "the single most likely failure mode", seen from the asset side:
+ * `php artisan anatomy:verify-mesh-identity` catches it after seeding, this
+ * catches it before.
+ *
+ * Returns the count for the summary table — null for a single-mesh organ, which
+ * is a legitimate state during migration and not a finding — and whether the
+ * row may still be ticked. The tick matters here in a way it does not for a sha
+ * mismatch: a row reading "✓ heart … 6 structures" beside a manifest promising
+ * nine is the table actively misleading the reader.
+ */
+function verifyStructureIdentity(document, model) {
+  if (!Array.isArray(model.structureNodes)) return { count: null, ok: true }
+
+  const before = failures.length
+  const label = model.organSlug
+  const described = describeStructureExport(document, model.organSlug)
+
+  for (const failure of described.failures) failures.push(`${label}: ${failure}`)
+
+  const { missing, extra } = diffStructureNodes(model.structureNodes, described.structureNodes)
+
+  check(
+    missing.length === 0,
+    `${label}: the manifest promises ${missing.length} structure node(s) the file does not ` +
+      `contain (${missing.join(', ')}). Every one is a structure whose model_object_name ` +
+      'points at nothing.',
+  )
+  check(
+    extra.length === 0,
+    `${label}: the file contains ${extra.length} structure node(s) the manifest does not list ` +
+      `(${extra.join(', ')}). Re-encode, so Branch B seeds from what shipped.`,
+  )
+  check(
+    described.rootNode === model.rootNode,
+    `${label}: the organ root is ${described.rootNode === null ? 'missing' : `"${described.rootNode}"`}` +
+      ` on disk, "${model.rootNode}" in the manifest`,
+  )
+
+  return { count: described.structureNodes.length, ok: failures.length === before }
 }
 
 async function main() {
@@ -164,14 +216,18 @@ async function main() {
 
   if (rows.length > 0) {
     console.log(
-      `  ${'organ'.padEnd(12)}${'payload'.padStart(10)}${'triangles'.padStart(12)}${'longest axis'.padStart(15)}`,
+      `  ${'organ'.padEnd(12)}${'payload'.padStart(10)}${'triangles'.padStart(12)}` +
+        `${'longest axis'.padStart(15)}${'structures'.padStart(12)}`,
     )
     for (const row of rows) {
       console.log(
         `  ${row.ok ? '✓' : '✗'} ${row.label.padEnd(10)}` +
           `${formatBytes(row.bytes).padStart(10)}` +
           `${row.triangles.toLocaleString('en-GB').padStart(12)}` +
-          `${(row.longestAxis?.toFixed(4) ?? '—').padStart(15)}`,
+          `${(row.longestAxis?.toFixed(4) ?? '—').padStart(15)}` +
+          // An em dash, not 0: a single-mesh organ has no structure nodes to
+          // count, which is a different statement from having lost them all.
+          `${(row.structures ?? '—').toString().padStart(12)}`,
       )
     }
     console.log('')

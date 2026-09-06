@@ -34,6 +34,7 @@ import {
   measureDocument,
 } from './lib/measure.mjs'
 import { normaliseScene } from './lib/normalise.mjs'
+import { describeStructureExport } from './lib/structureNodes.mjs'
 import { compressToKtx2, compressToWebp } from './lib/textures.mjs'
 
 const PIPELINE_VERSION = '1.0.0'
@@ -179,6 +180,26 @@ async function main() {
       `${source.textures.count} textures (${source.textures.codecs.join(', ') || 'none'})`,
   )
 
+  // Before anything expensive. A naming or grouping mistake is fixed in Blender
+  // and re-exported, so failing after a four-minute decimation run costs a round
+  // trip for nothing. The authoritative check is on the shipped file below;
+  // this one only saves time.
+  const sourceStructures = describeStructureExport(document, values.organ)
+
+  if (sourceStructures.failures.length > 0) {
+    console.error(`\n  ✗ ${basename(input)} is not a usable per-structure export:`)
+    for (const failure of sourceStructures.failures) console.error(`      ${failure}`)
+    console.error('\n  Nothing was written. Fix the export and re-run.\n')
+    process.exit(1)
+  }
+
+  step(
+    sourceStructures.perStructure
+      ? `${sourceStructures.structureNodes.length} structure nodes under root ` +
+          `"${sourceStructures.rootNode}"`
+      : 'single-mesh source: no per-structure nodes to preserve',
+  )
+
   await document.transform(dedup(), prune(), weld())
   step('deduplicated, pruned and welded')
 
@@ -228,6 +249,10 @@ async function main() {
 
   const normalisationCheck = checkNormalisation(measured.bounds, fitSize)
   const budgetCheck = checkBudgets({ bytes, triangles: measured.triangles }, budgets)
+  // Re-derived from the artefact rather than carried over from the source: dedup
+  // and prune rewrite the node graph, and a pipeline that drops a structure node
+  // must fail here rather than record a manifest row promising one.
+  const structures = describeStructureExport(shipped, values.organ)
 
   console.log('')
   report(
@@ -247,7 +272,18 @@ async function main() {
     normalisationCheck.ok,
   )
 
-  const failures = [...budgetCheck.failures, ...normalisationCheck.failures]
+  if (structures.perStructure) {
+    report(
+      'structures',
+      `${structures.structureNodes.length} nodes under "${structures.rootNode}", ` +
+        `${structures.materials} material${structures.materials === 1 ? '' : 's'}`,
+      structures.failures.length === 0,
+    )
+  }
+
+  for (const warning of structures.warnings) console.log(`  ! ${warning}`)
+
+  const failures = [...budgetCheck.failures, ...normalisationCheck.failures, ...structures.failures]
 
   if (failures.length > 0) {
     console.error(`\n  ✗ ${basename(output)} is not shippable:`)
@@ -292,6 +328,13 @@ async function main() {
       vertices: measured.vertices,
       meshes: measured.meshes,
       materials: measured.materials,
+      // The contract with handover 17 Branch B: MeshIdentitySeeder reads these
+      // two keys and joins them onto anatomical_structures by slug. Omitted
+      // entirely on a single-mesh organ, because a row carrying an empty list
+      // would read as "this model has no structures" and clear every claim.
+      ...(structures.perStructure
+        ? { rootNode: structures.rootNode, structureNodes: structures.structureNodes }
+        : {}),
       extensions: measured.extensions,
       textures: {
         count: measured.textures.count,
