@@ -34,7 +34,7 @@ import { Document, NodeIO } from '@gltf-transform/core'
 import { readBudgets, readFitSize, repoRoot } from './lib/config.mjs'
 import { checkBudgets, checkNormalisation, measureDocument } from './lib/measure.mjs'
 import { normaliseScene } from './lib/normalise.mjs'
-import { auditStructureNodes, structureNodeName } from './lib/structureNodes.mjs'
+import { describeStructureExport, structureNodeName } from './lib/structureNodes.mjs'
 
 /** Where the fixture lives. Outside public/, so .gitignore does not exclude it. */
 const FIXTURE_DIR = 'tests/Fixtures/models'
@@ -220,17 +220,13 @@ async function main() {
     )
   }
 
-  const audit = auditStructureNodes(document, ORGAN_SLUG)
+  // The same check `encode-model.mjs` runs on a real export, deliberately: the
+  // fixture's value is that everything around its geometry is real, so it has to
+  // clear the gate a licensed model will clear, not a weaker one written for it.
+  const audit = describeStructureExport(document, ORGAN_SLUG)
 
-  if (!audit.ok) {
-    throw new Error(
-      'Structure node audit failed: ' +
-        JSON.stringify({
-          foreign: audit.foreign,
-          duplicates: audit.duplicates,
-          unconventional: audit.unconventional,
-        }),
-    )
+  if (audit.failures.length > 0) {
+    throw new Error(`Structure node audit failed:\n      ${audit.failures.join('\n      ')}`)
   }
 
   const io = new NodeIO()
@@ -263,7 +259,7 @@ async function main() {
         modelFormat: 'glb',
         bytes: binary.byteLength,
         triangles: measured.triangles,
-        rootNode: ORGAN_SLUG,
+        rootNode: audit.rootNode,
         // The contract between Branch A and Branch B: every structure node this
         // file contains, and the point each one is centred on.
         structureNodes: audit.structureNodes,

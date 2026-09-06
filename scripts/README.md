@@ -185,6 +185,8 @@ produced. Files get replaced by hand, budgets get tightened, manifest rows get e
 - every model on disk matches its recorded `sha256`
 - every model re-measures inside the payload and triangle budgets
 - every model is still normalised to `FIT_SIZE`, centred, within tolerance
+- every per-structure model still contains exactly the structure nodes its row promises, under
+  the organ root its row names
 - every `registerId` has a row in `docs/asset-register.md`
 - every `.glb` in `public/models/` has a manifest row — an orphan file fails the run
 - `public/draco/` and `public/basis/` do not exist (handover 02 §4: 1.6 MB of decoder
@@ -287,3 +289,64 @@ back to Blender.
 
 The viewer does not import any of this. It receives `modelObjectName` in the DTO and hands
 it to `getObjectByName`, so the string stays opaque on that side and one copy is enough.
+
+### What the encoder enforces on a per-structure export
+
+`describeStructureExport()` decides whether a file is a per-structure export and then judges
+it. The encoder runs it twice: once on the source before any expensive work, so a naming
+mistake costs seconds rather than a decimation run, and once on the file that was actually
+written, which is the authoritative pass.
+
+**The trigger is not a flag.** A file is judged as per-structure when it either names
+structures _or_ carries more than one mesh node. That second clause is the point: an export
+whose object names were all mangled in Blender claims no structures at all, so a naming-only
+audit would find nothing to report and ship a model where every structure is unselectable. A
+genuine single-mesh organ — one mesh node, claiming nothing — stays exempt, which is what
+keeps the nine Tripo models encodable while the conversion is in progress.
+
+It fails a run for:
+
+- a node named for a different organ than the one being encoded
+- the same structure named twice, which makes `getObjectByName` a coin toss
+- a mesh node following no convention, which is a structure nobody can ever select
+- structures that share no common ancestor, so the organ has no root to transform as a unit
+- structures parented straight onto the normalisation pivot, which is the same failure
+  wearing the pipeline's own node as a disguise
+- an unnamed organ root, which the manifest has no way to record
+
+Grouping deeper is fine. `heart` → `heart-valves` → the valve meshes is a reasonable
+outliner, and the check is a nearest common _ancestor_, not a shared parent.
+
+More material slots than structures is a **warning**, not a failure. §15.1 states no budget
+for materials, so inventing one here would be inventing a gate; but per-structure slots
+cannot outnumber the structures, and each one is a draw call.
+
+### `rootNode` and `structureNodes` — the contract with Branch B
+
+A per-structure manifest row carries two extra keys:
+
+```jsonc
+{
+  "organSlug": "heart",
+  "rootNode": "heart",
+  "structureNodes": ["heart__left-ventricle", "heart__aorta", …],
+}
+```
+
+`Database\Seeders\MeshIdentitySeeder` reads exactly these and joins them onto
+`anatomical_structures.model_object_name` by slug. Nothing else populates that column, so
+the manifest is the contract, and both sides police it: `verify-models.mjs` fails when a
+file has lost a node the manifest promises (every one is a structure whose
+`model_object_name` now points at nothing) or gained one it does not list (a structure the
+model could teach and the database will never know about), and
+`php artisan anatomy:verify-mesh-identity` catches the same drift from the database side
+after seeding.
+
+**A single-mesh organ gets neither key**, rather than an empty list. The seeder reads an
+empty `structureNodes` as "this model has no structures" and would clear every claim on it.
+
+One thing the pipeline does that is worth knowing before reading a manifest: `dedup` merges
+byte-identical meshes, so a nine-structure organ built from one repeated shape reports
+`"meshes": 1` with nine structure nodes. Identity lives on the **node**, not the mesh, and
+survives the whole encode — dedup, prune, weld, decimation and meshopt — intact. The fixture
+encodes end to end from 41.5 KB to 4.6 KB with all nine node names present.
