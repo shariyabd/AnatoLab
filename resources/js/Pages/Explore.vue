@@ -4,6 +4,7 @@ import { Head, router } from '@inertiajs/vue3'
 import ViewerStage from '@/Components/Anatomy/ViewerStage.vue'
 import SectionLabel from '@/Components/Atelier/SectionLabel.vue'
 import AutoRotateSwitch from '@/Components/Explore/AutoRotateSwitch.vue'
+import ComingSoonPanel from '@/Components/Explore/ComingSoonPanel.vue'
 import InfoPanel from '@/Components/Explore/InfoPanel.vue'
 import OrganLibrary from '@/Components/Explore/OrganLibrary.vue'
 import StructureIndex from '@/Components/Explore/StructureIndex.vue'
@@ -19,6 +20,7 @@ import type {
   OrganDto,
   StructureDto,
   StructureId,
+  UpcomingOrganCard,
   ViewerLayer,
 } from '@/types/explore'
 
@@ -50,10 +52,15 @@ import type {
  * depends on one, and the viewer itself neither knows about them nor fetches
  * (invariant 3).
  */
-const props = defineProps<{
-  organs: ExploreOrganCard[]
-  organ: OrganDto | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    organs: ExploreOrganCard[]
+    upcoming?: UpcomingOrganCard[]
+    organ: OrganDto | null
+    comingSoon?: UpcomingOrganCard | null
+  }>(),
+  { upcoming: () => [], comingSoon: null },
+)
 
 const stage = useTemplateRef<InstanceType<typeof ViewerStage>>('stage')
 
@@ -112,8 +119,12 @@ const canInteract = computed(() => stage.value?.canInteract ?? false)
 function openOrgan(organ: ExploreOrganCard): void {
   if (organ.slug === props.organ?.slug) return
 
+  // `comingSoon` travels with `organ` on every switch. Both are null-or-set
+  // states of the same question — what is on the stage — so asking for one
+  // without the other leaves a deep link to /explore/stomach showing its
+  // "coming soon" panel next to the heart the student just opened.
   router.visit(`/explore/${organ.slug}`, {
-    only: ['organ'],
+    only: ['organ', 'comingSoon'],
     preserveState: true,
     preserveScroll: true,
   })
@@ -167,6 +178,19 @@ function highlightStructure(id: StructureId | null): void {
 }
 
 /**
+ * Named for whatever is on the stage: an organ, a taxonomy row, or neither.
+ * A deep link to a coming-soon organ that titles itself just "Explore" makes
+ * the browser tab and the history entry useless for the one navigation a
+ * student is most likely to want back.
+ */
+const pageTitle = computed(() => {
+  if (props.organ !== null) return `Explore · ${props.organ.name}`
+  if (props.comingSoon !== null) return `Explore · ${props.comingSoon.name} (coming soon)`
+
+  return 'Explore'
+})
+
+/**
  * The card for the organ on screen, for the two things the `OrganDto` does not
  * carry: its body system and its thumbnail. Both already travel with the
  * library payload, so the panel gets them from there rather than from a second
@@ -193,7 +217,7 @@ function playGuidedTour(): void {
 </script>
 
 <template>
-  <Head :title="organ ? `Explore · ${organ.name}` : 'Explore'" />
+  <Head :title="pageTitle" />
 
   <!--
     One h1, and it is not visible: the organ's name is set at display size by
@@ -208,6 +232,7 @@ function playGuidedTour(): void {
     <div class="space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
       <OrganLibrary
         :organs="organs"
+        :upcoming="upcoming"
         :current-slug="organ?.slug ?? null"
         @select="openOrgan"
         @prefetch="prefetchOrgan"
@@ -274,7 +299,16 @@ function playGuidedTour(): void {
 
     <!-- Detail, and the seat handover 08 takes. -->
     <div class="space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+      <!--
+        A slug that is in the taxonomy with no model yet. It replaces the info
+        panel rather than sitting above it: with `organ` null the panel has no
+        organ to describe, and two empty states stacked is not more honest than
+        one that says what is going on (handover 16).
+      -->
+      <ComingSoonPanel v-if="comingSoon" :organ="comingSoon" />
+
       <InfoPanel
+        v-else
         :organ="organ"
         :structure="selected"
         :detail="detail"

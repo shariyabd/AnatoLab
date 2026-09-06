@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import Icon from '@/Components/Atelier/Icon.vue'
 import SectionLabel from '@/Components/Atelier/SectionLabel.vue'
-import type { ExploreOrganCard } from '@/types/explore'
+import type { ExploreOrganCard, UpcomingOrganCard } from '@/types/explore'
 
 /**
  * The organ picker — handover 05, restyled by handover 15 Phase 2.
@@ -17,10 +17,14 @@ import type { ExploreOrganCard } from '@/types/explore'
  * arrives at the row the same way, and there is no reason for them to wait
  * longer for the model.
  */
-const props = defineProps<{
-  organs: readonly ExploreOrganCard[]
-  currentSlug: string | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    organs: readonly ExploreOrganCard[]
+    upcoming?: readonly UpcomingOrganCard[]
+    currentSlug: string | null
+  }>(),
+  { upcoming: () => [] },
+)
 
 defineEmits<{
   (event: 'select', organ: ExploreOrganCard): void
@@ -31,38 +35,62 @@ defineEmits<{
  * Below this, a flat list reads better and grouping is noise — nine organs
  * under seven headings is mostly headings. Above it the list stops being
  * scannable without them (handover 15 Phase 2).
+ *
+ * Counted over both lists, not just the published one. Handover 16 seeds the
+ * full taxonomy, so the panel is past this threshold long before the models
+ * are — and nine published organs scattered through eleven headings is exactly
+ * the case the headings exist for.
  */
 const GROUPING_THRESHOLD = 12
 
-const grouped = computed(() => props.organs.length > GROUPING_THRESHOLD)
+const totalCount = computed(() => props.organs.length + props.upcoming.length)
+
+const grouped = computed(() => totalCount.value > GROUPING_THRESHOLD)
 
 interface OrganGroup {
   readonly key: string
   readonly name: string
   readonly organs: readonly ExploreOrganCard[]
+  readonly upcoming: readonly UpcomingOrganCard[]
 }
 
 /**
  * Insertion-ordered, so the groups follow whatever order the API sent the
  * organs in. Re-sorting here would silently override a decision that belongs
  * to `AnatomyService::listPublishedOrgans`.
+ *
+ * Published organs are absorbed first so they set the order of the headings;
+ * the taxonomy then fills in behind them, and a system with nothing published
+ * yet appears at the end rather than pushing a system that has content down the
+ * panel. A system present only in the taxonomy still gets its heading — that is
+ * the point of showing coverage at all (handover 15 Phase 7).
  */
 const groups = computed<OrganGroup[]>(() => {
   const byKey = new Map<string, OrganGroup>()
 
-  for (const organ of props.organs) {
-    const key = organ.bodySystem?.slug ?? 'unfiled'
+  function group(key: string, name: string): OrganGroup {
     const existing = byKey.get(key)
 
-    if (existing === undefined) {
-      byKey.set(key, {
-        key,
-        name: organ.bodySystem?.name ?? 'Other',
-        organs: [organ],
-      })
-    } else {
-      byKey.set(key, { ...existing, organs: [...existing.organs, organ] })
-    }
+    if (existing !== undefined) return existing
+
+    const created: OrganGroup = { key, name, organs: [], upcoming: [] }
+    byKey.set(key, created)
+
+    return created
+  }
+
+  for (const organ of props.organs) {
+    const key = organ.bodySystem?.slug ?? 'unfiled'
+    const existing = group(key, organ.bodySystem?.name ?? 'Other')
+
+    byKey.set(key, { ...existing, organs: [...existing.organs, organ] })
+  }
+
+  for (const organ of props.upcoming) {
+    const key = organ.bodySystem?.slug ?? 'unfiled'
+    const existing = group(key, organ.bodySystem?.name ?? 'Other')
+
+    byKey.set(key, { ...existing, upcoming: [...existing.upcoming, organ] })
   }
 
   return [...byKey.values()]
@@ -96,7 +124,7 @@ function onThumbnailError(id: string): void {
       <SectionLabel tag="h2" id="organ-library-heading">Organ library</SectionLabel>
     </header>
 
-    <p v-if="organs.length === 0" class="px-4 pb-4 text-ui text-[var(--color-ink-soft)]">
+    <p v-if="totalCount === 0" class="px-4 pb-4 text-ui text-[var(--color-ink-soft)]">
       No organs have been published yet.
     </p>
 
@@ -114,7 +142,11 @@ function onThumbnailError(id: string): void {
           {{ group.name }}
         </h3>
 
-        <ul :aria-label="grouped ? group.name : 'Organs'" class="space-y-0.5">
+        <ul
+          v-if="group.organs.length > 0"
+          :aria-label="grouped ? group.name : 'Organs'"
+          class="space-y-0.5"
+        >
           <li v-for="organ in group.organs" :key="organ.id">
             <button
               type="button"
@@ -162,6 +194,54 @@ function onThumbnailError(id: string): void {
             </button>
           </li>
         </ul>
+
+        <!--
+          The coming-soon rows: the taxonomy handover 16 seeded, rendered as
+          what they are. A <li> and a <span>, never a <button> — the row has no
+          model to open, so the honest control is no control. `aria-disabled`
+          would announce a disabled button; there is no button to disable, and
+          a list item that is simply not interactive needs no ARIA at all.
+        -->
+        <ul
+          v-if="group.upcoming.length > 0"
+          :aria-label="grouped ? `${group.name}, coming soon` : 'Coming soon'"
+          class="space-y-0.5"
+        >
+          <!--
+            Recessed by colour token, never by an opacity on the row. Both
+            captions here are verified pairings on --color-surface
+            (design/palette.ts ATELIER_CONTRAST_PAIRINGS); an opacity wrapper
+            would multiply straight through them and put text that measures
+            4.5:1 in the token layer somewhere under 3:1 on screen, which is the
+            exact failure handover 15's contrast criterion exists to catch. The
+            swatch carries the fade instead — it is aria-hidden decoration and
+            has no ratio to lose.
+          -->
+          <li v-for="organ in group.upcoming" :key="organ.id">
+            <span
+              class="flex w-full items-center gap-3 rounded-tile border border-transparent p-2 text-left"
+            >
+              <span
+                class="size-11 shrink-0 rounded-tile opacity-30"
+                :style="{ backgroundColor: organ.accentColor }"
+                aria-hidden="true"
+              />
+
+              <span class="min-w-0 flex-1">
+                <span
+                  class="block truncate font-display text-[1.0625rem] leading-tight text-[var(--color-ink-soft)]"
+                >
+                  {{ organ.name }}
+                </span>
+                <span
+                  class="block truncate text-xs uppercase tracking-wide text-[var(--color-ink-muted)]"
+                >
+                  Coming soon
+                </span>
+              </span>
+            </span>
+          </li>
+        </ul>
       </template>
     </div>
 
@@ -170,12 +250,13 @@ function onThumbnailError(id: string): void {
       already the whole library, so that link would go to the page it is on.
     -->
     <footer
-      v-if="organs.length > 0"
+      v-if="totalCount > 0"
       class="flex items-center gap-1.5 border-t border-[var(--color-hairline)] px-4 py-3 text-xs text-[var(--color-ink-muted)]"
     >
       <Icon name="cube" class="size-3.5" />
       {{ organs.length }} organs across {{ systemCount }}
       {{ systemCount === 1 ? 'system' : 'systems' }}
+      <template v-if="upcoming.length > 0">&middot; {{ upcoming.length }} coming soon</template>
     </footer>
   </section>
 </template>

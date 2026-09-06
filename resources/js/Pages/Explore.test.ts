@@ -114,9 +114,12 @@ describe('viewer lifecycle', () => {
 
     await buttonLabelled(wrapper, 'Lungs').trigger('click')
 
+    // `comingSoon` rides along with `organ` (handover 16): both answer "what is
+    // on the stage", and asking for one without the other leaves a stale
+    // coming-soon banner beside the organ the student just opened.
     expect(visit).toHaveBeenCalledWith(
       '/explore/lungs',
-      expect.objectContaining({ only: ['organ'], preserveState: true }),
+      expect.objectContaining({ only: ['organ', 'comingSoon'], preserveState: true }),
     )
     // A full navigation, or a `v-if` on the stage, would have torn this down.
     expect(fakeViewers).toHaveLength(1)

@@ -44,6 +44,26 @@ export interface ExploreOrganCard {
   readonly structureCount?: number
 }
 
+/**
+ * One inert row in the coverage roadmap — handover 16, handover 15 Phase 7.
+ *
+ * Mirrors `App\Http\Resources\Explore\UpcomingOrganResource`. The three keys
+ * `ExploreOrganCard` has that this does not — `modelUrl`, `thumbnailUrl`,
+ * `structureCount` — are missing on purpose and are documented on that
+ * Resource. The type is the enforcement: a row that cannot be given a
+ * `modelUrl` cannot be handed to `prefetchOrgan`, and one that cannot be
+ * prefetched is one the panel cannot accidentally make clickable.
+ */
+export interface UpcomingOrganCard {
+  readonly id: string
+  readonly slug: string
+  readonly name: string
+  readonly scientificName: string | null
+  readonly description: string | null
+  readonly accentColor: string
+  readonly bodySystem?: { readonly slug: string; readonly name: string }
+}
+
 /** One entry in a structure's `relatedStructures`. */
 export interface RelatedStructure {
   readonly id: string
