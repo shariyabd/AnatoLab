@@ -360,4 +360,56 @@ defineExpose({
   height: 100%;
   touch-action: none;
 }
+
+/*
+ | The hover chip (handover 17). The viewer creates and positions this node
+ | itself — its transform is written on a throttled pick, never bound to a
+ | reactive ref — so the host's only job is to say what it looks like.
+ |
+ | `pointer-events: none` is load-bearing: a chip that follows the cursor and
+ | accepts pointer events would sit between the cursor and the mesh it names and
+ | swallow the click that selects it.
+ |
+ | Offset down and right of the cursor rather than centred on it, so the chip
+ | never covers the structure it is pointing at, and never lands under the
+ | pointer where it would fight the `cursor: pointer` affordance.
+ */
+.viewer-stage :deep(.anatomy-viewer__hover-chip) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  margin: 0.875rem 0 0 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  box-shadow: var(--shadow-card, 0 1px 3px rgb(0 0 0 / 0.18));
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/*
+ | No easing on the chip's own movement — it is pinned to the cursor, and a
+ | transition would make it lag behind by exactly the transition duration.
+ | The fade in is a different question, and it is the one thing here that
+ | reduced motion turns off.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .viewer-stage :deep(.anatomy-viewer__hover-chip) {
+    animation: viewer-chip-in 120ms ease-out;
+  }
+}
+
+@keyframes viewer-chip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 </style>
