@@ -88,10 +88,50 @@ it('deep links to one organ by slug', function (): void {
         ->assertInertia(fn ($page) => $page->where('organ.slug', 'lungs'));
 });
 
-it('404s on an organ that is not published', function (): void {
-    $draft = Organ::factory()->create(['slug' => 'pancreas']);
+it('renders the coming-soon state for an organ that is not published', function (): void {
+    // Changed by handover 16. A draft organ used to 404, which told a student
+    // the pancreas was not part of this product. The full taxonomy is now
+    // seeded as draft rows on purpose, so a slug in the taxonomy renders an
+    // inert "coming soon" panel and no organ (docs/organ-taxonomy.md §7).
+    $draft = Organ::factory()->create(['slug' => 'pancreas', 'name' => 'Pancreas']);
 
-    $this->get("/explore/{$draft->slug}")->assertNotFound();
+    $this->get("/explore/{$draft->slug}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Explore')
+            ->where('organ', null)
+            ->where('comingSoon.slug', 'pancreas')
+            ->where('comingSoon.name', 'Pancreas')
+        );
+});
+
+it('never sends a model URL for an organ it will not serve', function (): void {
+    // The coming-soon payload is the one place a draft organ's `model_path`
+    // could reach the client. It is a `models/pending/` placeholder today and
+    // may be a licence-blocked asset tomorrow; neither belongs in a page prop
+    // (App\Http\Resources\Explore\UpcomingOrganResource).
+    Organ::factory()->create(['slug' => 'pancreas']);
+
+    $this->get('/explore/pancreas')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->missing('comingSoon.modelUrl')
+            ->missing('comingSoon.thumbnailUrl')
+            ->missing('comingSoon.structureCount')
+        );
+});
+
+it('lists the taxonomy alongside the library, without model URLs', function (): void {
+    Organ::factory()->published()->create(['name' => 'Heart']);
+    Organ::factory()->count(3)->create();
+
+    $this->get('/explore')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('organs', 1)
+            ->has('upcoming', 3)
+            ->missing('upcoming.0.modelUrl')
+        );
 });
 
 it('404s on a slug that does not exist', function (): void {
@@ -178,7 +218,10 @@ it('re-serialises only the organ when the client switches organs', function (): 
         // is a 409 and would make this test look like a routing failure.
         'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version(request()),
         'X-Inertia-Partial-Component' => 'Explore',
-        'X-Inertia-Partial-Data' => 'organ',
+        // Both props the client asks for on a switch. `comingSoon` travels with
+        // `organ` so a switch away from a coming-soon deep link clears the
+        // banner (Pages/Explore.vue, openOrgan).
+        'X-Inertia-Partial-Data' => 'organ,comingSoon',
     ])
         ->get('/explore/lungs')
         ->assertOk()
@@ -187,5 +230,8 @@ it('re-serialises only the organ when the client switches organs', function (): 
     expect($page['component'])->toBe('Explore')
         ->and($page['props'])->toHaveKey('organ')
         ->and($page['props']['organ']['slug'])->toBe('lungs')
-        ->and($page['props'])->not->toHaveKey('organs');
+        ->and($page['props'])->toHaveKey('comingSoon')
+        ->and($page['props']['comingSoon'])->toBeNull()
+        ->and($page['props'])->not->toHaveKey('organs')
+        ->and($page['props'])->not->toHaveKey('upcoming');
 });

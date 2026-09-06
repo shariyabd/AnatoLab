@@ -29,6 +29,7 @@ final class DatabaseSeeder extends Seeder
             PlatformSeeder::class,
 
             AnatomySeeder::class,
+            BodyTaxonomySeeder::class,
             LessonSeeder::class,
             AssessmentSeeder::class,
             MissionSeeder::class,

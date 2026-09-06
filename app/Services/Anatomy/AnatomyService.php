@@ -38,6 +38,8 @@ final class AnatomyService
 
     private const KEY_ORGAN_LIST = 'anatomy:organs';
 
+    private const KEY_UPCOMING_LIST = 'anatomy:organs:upcoming';
+
     public function __construct(private readonly CacheRepository $cache) {}
 
     /**
@@ -67,6 +69,53 @@ final class AnatomyService
         $this->cache->put(self::KEY_ORGAN_LIST, $organs, self::TTL_SECONDS);
 
         return $organs;
+    }
+
+    /**
+     * The coverage roadmap: organs that exist in the taxonomy with no model yet.
+     *
+     * Handover 16 seeds all eleven systems and the full organ taxonomy as draft
+     * rows so coverage is visible and honest before an asset is encoded. This
+     * is the read that makes them visible — deliberately, and only as far as a
+     * name and a system. `UpcomingOrganResource` is what enforces that; this
+     * method's job is to load the rows without their structures, because a
+     * taxonomy row has none by construction (docs/organ-taxonomy.md §1).
+     *
+     * Draft-by-status, not draft-by-emptiness: an organ an admin has taken back
+     * to draft to fix belongs here too, and its structures still must not ship.
+     *
+     * @return Collection<int, Organ>
+     */
+    public function listUpcomingOrgans(): Collection
+    {
+        $cached = $this->cache->get(self::KEY_UPCOMING_LIST);
+
+        if ($cached instanceof Collection) {
+            return $cached;
+        }
+
+        /** @var Collection<int, Organ> $organs */
+        $organs = Organ::query()
+            ->where('status', OrganStatus::Draft)
+            ->with('bodySystem')
+            ->orderBy('name')
+            ->get();
+
+        $this->cache->put(self::KEY_UPCOMING_LIST, $organs, self::TTL_SECONDS);
+
+        return $organs;
+    }
+
+    /**
+     * One taxonomy row by slug, for the deep link that must not 404.
+     *
+     * Resolved out of the list rather than with its own query and its own cache
+     * key: the page that renders this already loads the list, so the second
+     * lookup is free, and there is one fewer key for `forgetOrgan` to remember.
+     */
+    public function findUpcomingOrganBySlug(string $slug): ?Organ
+    {
+        return $this->listUpcomingOrgans()->firstWhere('slug', $slug);
     }
 
     /**
@@ -178,6 +227,11 @@ final class AnatomyService
     public function forgetOrgan(Organ $organ): void
     {
         $this->cache->forget(self::KEY_ORGAN_LIST);
+
+        // Publishing moves a row from one list to the other, so both are stale
+        // after any organ write — not just the one the row is currently in.
+        $this->cache->forget(self::KEY_UPCOMING_LIST);
+
         $this->cache->forget(self::organKey($organ->slug));
 
         // The slug may have just changed. The entry cached under the old one

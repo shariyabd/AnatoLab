@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Anatomy\OrganResource;
 use App\Http\Resources\Explore\ExploreOrganResource;
+use App\Http\Resources\Explore\UpcomingOrganResource;
 use App\Models\Organ;
 use App\Services\Anatomy\AnatomyService;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -68,27 +69,56 @@ final class ExploreController extends Controller
     {
         $found = $this->anatomy->findPublishedOrganBySlug($organ);
 
-        if ($found === null) {
-            throw new NotFoundHttpException('No published organ matches that slug.');
+        if ($found !== null) {
+            return $this->page($found);
         }
 
-        return $this->page($found);
+        // A slug that is in the taxonomy but has no model yet is not an error.
+        // Handover 16 seeds the whole body as draft rows so coverage is an
+        // honest roadmap rather than an implication, and handover 15 Phase 7
+        // asks for that state to be "visibly inert, not clickable, not a 404".
+        // A 404 here would tell a student the stomach is not part of this
+        // product, which is the opposite of what the taxonomy row says.
+        $upcoming = $this->anatomy->findUpcomingOrganBySlug($organ);
+
+        if ($upcoming !== null) {
+            return $this->page(null, $upcoming);
+        }
+
+        throw new NotFoundHttpException('No organ matches that slug.');
     }
 
     /**
      * Null organ is a real state, not a failure: a fresh database with no
      * published organs renders the page and its empty state rather than a 404
      * on a route the navigation links to.
+     *
+     * `comingSoon` is the second null-organ state — a taxonomy row asked for by
+     * slug. It is a separate prop rather than a flag on `organ` because `organ`
+     * is an `OrganDto` handed straight to the viewer, and widening it to carry
+     * a row the viewer can do nothing with would break the frozen contract in
+     * resources/js/anatomy/types.ts for the sake of one banner.
+     *
+     * It is also in the client's partial-reload list alongside `organ`
+     * (`Pages/Explore.vue`), so switching from a coming-soon deep link to a
+     * published organ clears it. Adding a prop here without adding it there is
+     * how a stale banner survives a navigation.
      */
-    private function page(?Organ $organ): Response
+    private function page(?Organ $organ, ?Organ $comingSoon = null): Response
     {
         return Inertia::render('Explore', [
             'organs' => fn (): array => self::payload(
                 ExploreOrganResource::collection($this->anatomy->listPublishedOrgans()),
             ),
+            'upcoming' => fn (): array => self::payload(
+                UpcomingOrganResource::collection($this->anatomy->listUpcomingOrgans()),
+            ),
             'organ' => fn (): ?array => $organ === null
                 ? null
                 : self::payload(new OrganResource($organ)),
+            'comingSoon' => fn (): ?array => $comingSoon === null
+                ? null
+                : self::payload(new UpcomingOrganResource($comingSoon)),
         ]);
     }
 
