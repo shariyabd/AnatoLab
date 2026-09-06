@@ -56,10 +56,7 @@ function toggleStatus(lesson: AdminLesson): void {
             </td>
             <td class="px-4 py-2 text-[var(--color-ink-muted)]">
               {{ lesson.organ?.name ?? '—' }}
-              <span
-                v-if="lesson.organ?.status === 'draft'"
-                class="ml-1 text-xs text-amber-600 dark:text-amber-400"
-              >
+              <span v-if="lesson.organ?.status === 'draft'" class="ml-1 text-xs text-amber-600">
                 (organ is draft)
               </span>
             </td>

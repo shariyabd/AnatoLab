@@ -249,7 +249,7 @@ defineExpose({
 
 <template>
   <div
-    class="viewer-stage relative overflow-hidden rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]"
+    class="viewer-stage relative overflow-hidden rounded-card bg-[var(--color-surface)] shadow-card"
   >
     <!--
       Rule 2: the viewer owns everything inside this element. It must stay
@@ -275,7 +275,7 @@ defineExpose({
 
     <div
       v-if="isLoading"
-      class="absolute inset-x-0 top-0 z-10 h-0.5 bg-[var(--color-border-subtle)]"
+      class="absolute inset-x-0 top-0 z-20 h-0.5 bg-[var(--color-hairline)]"
       role="progressbar"
       aria-label="Loading the 3D model"
       :aria-valuenow="Math.round(progress * 100)"
@@ -293,7 +293,7 @@ defineExpose({
     -->
     <div
       v-if="!canInteract"
-      class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-surface-raised)] p-6"
+      class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-surface)] p-6"
       role="status"
     >
       <!--
@@ -306,10 +306,8 @@ defineExpose({
         product. Covering it is a presentation choice and costs nothing: the
         instant a model loads, `canInteract` is true and this element is gone.
       -->
-      <div
-        class="max-w-sm rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-4 py-3 text-center shadow-sm"
-      >
-        <p class="text-xs leading-relaxed text-[var(--color-ink-muted)]">
+      <div class="max-w-sm rounded-card bg-[var(--color-surface-sunk)] px-5 py-4 text-center">
+        <p class="font-body text-[0.9375rem] leading-relaxed text-[var(--color-ink)]">
           <template v-if="!isAvailable">
             This browser cannot show 3D graphics, so the model is unavailable.
           </template>
@@ -324,7 +322,7 @@ defineExpose({
           student thinking the page is broken, when in fact everything they need
           to learn from it is beside them (PRD §31, §40).
         -->
-        <p class="mt-2 text-xs leading-relaxed text-[var(--color-ink-muted)]">
+        <p class="mt-2 font-body text-[0.9375rem] leading-relaxed text-[var(--color-ink-soft)]">
           Everything else on this page works — every structure is listed, described and selectable
           without it.
         </p>
@@ -332,7 +330,7 @@ defineExpose({
     </div>
 
     <div v-else-if="organ === null" class="absolute inset-0 flex items-center justify-center p-6">
-      <p class="text-xs text-[var(--color-ink-muted)]">No organ selected.</p>
+      <p class="font-body text-[0.9375rem] text-[var(--color-ink-muted)]">No organ selected.</p>
     </div>
 
     <!-- Lane-specific chrome: the quiz bar, a mission step, a simulation dial. -->

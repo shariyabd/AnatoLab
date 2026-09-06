@@ -13,13 +13,13 @@ const tone = computed(() => {
   switch (props.status) {
     case 'published':
     case 'indexed':
-      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700'
     case 'review':
     case 'processing':
     case 'pending':
-      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+      return 'bg-amber-500/15 text-amber-700'
     case 'failed':
-      return 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+      return 'bg-rose-500/15 text-rose-700'
     default:
       return 'bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]'
   }

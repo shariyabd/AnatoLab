@@ -19,6 +19,13 @@ export default defineConfig({
     // the unit tests that never create a WebGL context.
     environment: 'jsdom',
     include: ['resources/js/**/*.test.ts'],
+
+    // Added by Handover 15. Vitest stubs every CSS import to an empty string,
+    // including `?raw`, so theme.contrast.test.ts cannot read the token layer
+    // it exists to check. Scoped to theme.css rather than turned on globally:
+    // no other spec imports a stylesheet, and processing app.css would put a
+    // full Tailwind build inside the unit suite.
+    css: { include: [/theme\.css/] },
     globals: true,
   },
 })

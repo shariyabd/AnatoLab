@@ -331,10 +331,7 @@ function togglePublished(structure: AdminStructure): void {
                 />
               </div>
 
-              <p
-                v-if="!structure.anchorMatchesCurrentModel"
-                class="mt-1 text-xs text-amber-600 dark:text-amber-400"
-              >
+              <p v-if="!structure.anchorMatchesCurrentModel" class="mt-1 text-xs text-amber-600">
                 <template v-if="structure.authoredAgainst === null">
                   No authoring record — placed before this tool existed.
                 </template>

@@ -2,11 +2,15 @@
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import ViewerStage from '@/Components/Anatomy/ViewerStage.vue'
+import SectionLabel from '@/Components/Atelier/SectionLabel.vue'
+import AutoRotateSwitch from '@/Components/Explore/AutoRotateSwitch.vue'
 import InfoPanel from '@/Components/Explore/InfoPanel.vue'
 import OrganLibrary from '@/Components/Explore/OrganLibrary.vue'
 import StructureIndex from '@/Components/Explore/StructureIndex.vue'
+import TipNote from '@/Components/Explore/TipNote.vue'
 import ToolRail from '@/Components/Explore/ToolRail.vue'
 import TutorPanel from '@/Components/Tutor/TutorPanel.vue'
+import { GUIDED_TOUR_ID } from '@/composables/useAnatomyViewer'
 import { useLearningEvents } from '@/composables/useLearningEvents'
 import { usePrefersReducedMotion } from '@/composables/usePrefersReducedMotion'
 import { useStructureDetail } from '@/composables/useStructureDetail'
@@ -161,91 +165,125 @@ function changeLayer(layer: ViewerLayer): void {
 function highlightStructure(id: StructureId | null): void {
   stage.value?.highlightStructure(id)
 }
+
+/**
+ * The card for the organ on screen, for the two things the `OrganDto` does not
+ * carry: its body system and its thumbnail. Both already travel with the
+ * library payload, so the panel gets them from there rather than from a second
+ * request.
+ */
+const currentCard = computed(
+  () => props.organs.find((card) => card.slug === props.organ?.slug) ?? null,
+)
+
+/**
+ * The honest form of the handover's "Animate".
+ *
+ * The models carry no animation clips, so this is the viewer's scripted camera
+ * and marker choreography over the organ's structures. `InfoPanel` hides the
+ * control when there is nothing to choreograph, which is the same condition the
+ * viewer tests before reporting the capability degraded.
+ */
+function playGuidedTour(): void {
+  // Not tracked: `ClientEventType` is the closed set a browser is allowed to
+  // assert, and adding to it means adding to App\Enums\LearningEventType —
+  // the Assessment lane's file, and not something a restyle may reach into.
+  void stage.value?.triggerAnimation(GUIDED_TOUR_ID)
+}
 </script>
 
 <template>
   <Head :title="organ ? `Explore · ${organ.name}` : 'Explore'" />
 
-  <div class="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)_17rem]">
-    <!-- Organ library and structure index: one column of navigation. -->
-    <div class="space-y-6">
-      <section aria-labelledby="organ-library-heading">
-        <h2
-          id="organ-library-heading"
-          class="mb-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]"
-        >
-          Organs
-        </h2>
+  <!--
+    One h1, and it is not visible: the organ's name is set at display size by
+    the information panel, and a second copy of it above the canvas would be
+    the same words twice at two sizes. The heading still has to exist for the
+    document outline and for the skip link's target to lead somewhere named.
+  -->
+  <h1 class="sr-only">{{ organ ? `Explore the ${organ.name}` : 'Explore' }}</h1>
 
-        <OrganLibrary
-          :organs="organs"
-          :current-slug="organ?.slug ?? null"
-          @select="openOrgan"
-          @prefetch="prefetchOrgan"
-        />
-
-        <p v-if="organs.length === 0" class="text-xs text-[var(--color-ink-muted)]">
-          No organs have been published yet.
-        </p>
-      </section>
-
-      <section v-if="organ" aria-labelledby="structure-index-heading">
-        <h2
-          id="structure-index-heading"
-          class="mb-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]"
-        >
-          Structures
-        </h2>
-
-        <StructureIndex
-          :structures="structures"
-          :selected-id="selectedId"
-          :accent-color="organ.accentColor"
-          @select="openStructure"
-          @hover="highlightStructure"
-        />
-      </section>
-    </div>
-
-    <!-- The viewer and its controls. -->
-    <div class="space-y-3">
-      <h1 class="text-xl font-semibold tracking-tight">
-        {{ organ ? organ.name : 'Explore' }}
-      </h1>
-
-      <ViewerStage
-        ref="stage"
-        :organ="organ"
-        :reduced-motion="prefersReducedMotion"
-        class="aspect-[4/3] w-full"
-        @selected="onViewerSelected"
+  <div class="grid items-start gap-5 lg:grid-cols-[17rem_minmax(0,1fr)_22rem]">
+    <!-- Navigation: the library, then what is on the model in front of you. -->
+    <div class="space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+      <OrganLibrary
+        :organs="organs"
+        :current-slug="organ?.slug ?? null"
+        @select="openOrgan"
+        @prefetch="prefetchOrgan"
       />
 
-      <ToolRail
-        :disabled="!canInteract"
-        :auto-rotate="stage?.autoRotate ?? false"
-        :layer="stage?.layer ?? 'solid'"
-        :isolated="(stage?.isolatedId ?? null) !== null"
-        :has-selection="selected !== null"
-        :reduced-motion="prefersReducedMotion"
-        :degraded="stage?.degraded ?? {}"
-        @update:auto-rotate="(value: boolean) => stage?.setAutoRotate(value)"
-        @update:layer="changeLayer"
-        @zoom="(direction: 1 | -1) => stage?.zoom(direction)"
-        @reset="stage?.resetView()"
-        @toggle-isolate="toggleIsolate"
+      <StructureIndex
+        v-if="organ"
+        :structures="structures"
+        :selected-id="selectedId"
+        :accent-color="organ.accentColor"
+        @select="openStructure"
+        @hover="highlightStructure"
       />
     </div>
+
+    <!--
+      The stage. Everything that floats over the canvas goes in the overlay
+      slot, so ViewerStage stays the shared mount F06, F07, F09 and F12 use and
+      none of them inherits Explore's chrome.
+    -->
+    <ViewerStage
+      ref="stage"
+      :organ="organ"
+      :reduced-motion="prefersReducedMotion"
+      class="aspect-[4/3] w-full"
+      @selected="onViewerSelected"
+    >
+      <template #overlay>
+        <ToolRail
+          :disabled="!canInteract"
+          :layer="stage?.layer ?? 'solid'"
+          :isolated="(stage?.isolatedId ?? null) !== null"
+          :has-selection="selected !== null"
+          :degraded="stage?.degraded ?? {}"
+          @update:layer="changeLayer"
+          @zoom="(direction: 1 | -1) => stage?.zoom(direction)"
+          @reset="stage?.resetView()"
+          @toggle-isolate="toggleIsolate"
+        />
+
+        <template v-if="canInteract">
+          <TipNote />
+
+          <!--
+            On a scrim, not bare on the canvas. The label floats over whatever
+            the model and its plinth happen to be, and warm grey on mid-grey is
+            2.2:1 — a caption that is only legible against a pale specimen is
+            not a caption.
+          -->
+          <SectionLabel
+            class="absolute bottom-3 left-3 z-10 rounded-full bg-[var(--color-surface)]/85 px-2.5 py-1"
+          >
+            3D specimen<template v-if="organ"> &middot; {{ organ.name }}</template>
+          </SectionLabel>
+
+          <AutoRotateSwitch
+            :model-value="stage?.autoRotate ?? false"
+            :reduced-motion="prefersReducedMotion"
+            @update:model-value="(value: boolean) => stage?.setAutoRotate(value)"
+          />
+        </template>
+      </template>
+    </ViewerStage>
 
     <!-- Detail, and the seat handover 08 takes. -->
-    <div class="space-y-6">
+    <div class="space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
       <InfoPanel
         :organ="organ"
         :structure="selected"
         :detail="detail"
         :detail-failed="detailFailed"
         :selectable-ids="selectableIds"
+        :body-system-name="currentCard?.bodySystem?.name ?? null"
+        :thumbnail-url="currentCard?.thumbnailUrl ?? null"
         @select-related="openStructure"
+        @play-tour="playGuidedTour"
       />
 
       <!--

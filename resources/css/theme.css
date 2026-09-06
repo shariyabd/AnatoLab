@@ -1,0 +1,187 @@
+/*
+ |-------------------------------------------------------------------------------
+ | The atelier token layer — Handover 15 Phase 0
+ |-------------------------------------------------------------------------------
+ |
+ | This file is the single source of truth for every colour, radius, shadow and
+ | type step in the application. Nothing outside it may hardcode one. It is
+ | imported by app.css after that file's remaining legacy tokens, so where the
+ | two define the same name this one wins.
+ |
+ | Two values differ from the handover's literal table, both because the number
+ | it gives cannot pass WCAG 2.2 AA at the size the handover then uses it at.
+ | The ratios below were measured against the sRGB grounds in this file, not
+ | estimated; resources/js/design/theme.contrast.test.ts recomputes them from
+ | these declarations and fails the build if a value drifts under threshold.
+ |
+ |   --color-ink-muted   handover #9C8E85 measures 2.98:1 on --color-paper and
+ |                       is specified as the colour of the search placeholder,
+ |                       the body-system caption and the wordmark tagline — all
+ |                       text. Darkened along its own hue to the lightest value
+ |                       that clears 4.5:1 on all three light grounds.
+ |   --color-accent-ink  the handover's literal string is corrupt
+ |                       (`#B4services4A38`). Reconstructed as #B44A38, which is
+ |                       the reading that both fits the six hex digits present
+ |                       and clears 4.5:1 on --color-accent-soft, the pairing
+ |                       the handover specifies for it.
+ |
+ | Dark theme is deliberately absent: the atelier language is light-first and
+ | the handover forbids a half-built dark variant. app.css still carries the
+ | pre-existing `.dark` overrides for the five token names that survive from the
+ | previous palette; the tokens introduced here have no dark value, which is why
+ | nothing that reads them may ship before that decision is taken.
+ */
+
+/*
+ | Self-hosted, latin subset only, `font-display: swap`. English-only is a
+ | settled MVP decision (docs/project-context.md §5.2), so the latin-ext,
+ | greek, cyrillic and vietnamese ranges Google serves are not shipped: they
+ | would triple the payload for glyphs no page can render.
+ |
+ | All three families are SIL OFL 1.1; the licences ride alongside the files in
+ | resources/fonts/.
+ */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('../fonts/fraunces-latin-var.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/spectral-latin-400.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/spectral-latin-400-italic.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/spectral-latin-600.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../fonts/inter-latin-var.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  /* Paper — the whole product sits on warm off-white, never pure grey. */
+  --color-paper: #fbf7f3;
+  --color-surface: #ffffff;
+  --color-surface-sunk: #f6f0ea;
+
+  /* Ink — warm near-black, never #000 and never blue-grey. */
+  --color-ink: #2a2320; /* 14.49:1 on paper */
+  --color-ink-soft: #6b5d55; /* 5.93:1 on paper */
+  --color-ink-muted: #776c66; /* 4.78:1 on paper — see the note above */
+  --color-hairline: #ebe1d8; /* decorative rules only: 1.21:1 */
+
+  /*
+   | Not in the handover's table, and the one token added to it. --color-hairline
+   | is 1.21:1 on paper, so it cannot be the visible boundary of a control —
+   | WCAG 2.2 SC 1.4.11 asks 3:1 for that, and Phase 5's outline buttons and
+   | Phase 1's search pill are exactly that case. This is the same distinction
+   | the previous palette drew between border-subtle and border-strong, redrawn
+   | warm.
+   */
+  --color-hairline-strong: #918a85; /* 3.19:1 on paper */
+
+  /* Accent */
+  --color-accent: #e3705a;
+  --color-accent-soft: #fcefea;
+  --color-accent-ink: #b44a38; /* 4.70:1 on accent-soft */
+
+  /* Functional */
+  --color-hotspot: #e8722e;
+  --color-hotspot-live: #2563eb;
+  --color-note: #fdf4d6;
+  --color-note-edge: #f0e3b0;
+
+  /* Shadows — warm-tinted, never neutral black. */
+  --shadow-card: 0 1px 2px rgb(42 35 32 / 0.04), 0 8px 24px rgb(42 35 32 / 0.06);
+  --shadow-rail: 0 2px 6px rgb(42 35 32 / 0.06), 0 12px 32px rgb(42 35 32 / 0.08);
+
+  --radius-card: 1.125rem;
+  --radius-tile: 0.75rem;
+
+  /*
+   | Three faces, three jobs. Fraunces carries the personality and is never used
+   | for UI chrome; Spectral is for reading and is never used for a button;
+   | Inter is for anything the eye scans rather than reads.
+   */
+  --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Spectral', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Tailwind's default utility family, so unstyled text lands on the UI face. */
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-body);
+
+  /* The scale. Six steps, no more — a seventh always turns out to be a fifth. */
+  --text-display: 2.75rem; /* 44 */
+  --text-display--line-height: 1.1;
+  --text-display--font-weight: 600;
+
+  --text-title: 1.75rem; /* 28 */
+  --text-title--line-height: 1.2;
+  --text-title--font-weight: 600;
+
+  --text-subtitle: 1.125rem; /* 18 */
+  --text-subtitle--line-height: 1.4;
+
+  --text-body: 1rem; /* 16 */
+  --text-body--line-height: 1.7;
+
+  --text-ui: 0.875rem; /* 14 */
+  --text-ui--line-height: 1.5;
+
+  --text-label: 0.6875rem; /* 11 */
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.14em;
+  --text-label--font-weight: 600;
+}
+
+@layer base {
+  /*
+   | Fraunces carries an optical-size axis. Left to itself the browser picks a
+   | design size from the rendered size, which is the entire point of the axis
+   | and the difference between a 44px heading that looks drawn and one that
+   | looks scaled up from body copy. It is a no-op for the two faces that have
+   | no such axis, so it belongs on the root rather than on a display class.
+   */
+  html {
+    font-optical-sizing: auto;
+  }
+}

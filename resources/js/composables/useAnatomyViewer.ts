@@ -20,7 +20,7 @@
  */
 
 import { onBeforeUnmount, onMounted, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
-import { AnatomyViewer } from '@/anatomy'
+import { AnatomyViewer, GUIDED_TOUR_ID } from '@/anatomy'
 import type { AnimationStep } from '@/anatomy/animation'
 import type { SimulationState } from '@/anatomy/simulation'
 import type {
@@ -35,6 +35,16 @@ import type {
   ViewerLayer,
   ViewerMode,
 } from '@/anatomy/types'
+
+/**
+ * Re-exported so a page can ask for the guided tour by name.
+ *
+ * The identifier lives in the viewer library and nothing outside this file may
+ * import from there (invariant 3). Passing the literal `'tour'` at a call site
+ * would put a copy of a viewer constant in a Vue component, which is the drift
+ * this bridge exists to prevent.
+ */
+export { GUIDED_TOUR_ID }
 
 type EventHandlers = {
   [E in ViewerEventName]?: (payload: ViewerEventMap[E]) => void

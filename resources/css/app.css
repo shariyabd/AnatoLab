@@ -1,26 +1,28 @@
 @import 'tailwindcss';
 
 /*
- | Dark mode follows an explicit class on <html>, set before first paint by the
- | inline script in app.blade.php, with the OS preference as the default. A
- | media-query-only theme cannot be overridden by the user; a class-only theme
- | flashes the wrong colours on load. This does neither.
+ | The atelier palette, type scale, radii, shadows and self-hosted faces
+ | (handover 15 Phase 0). It is the source of truth for every visual value in
+ | the application; the block below holds only what it does not define.
  */
-@custom-variant dark (&:where(.dark, .dark *));
+@import './theme.css';
 
 /*
+ | What is left of the pre-atelier palette.
+ |
+ | --color-surface, --color-ink, --color-ink-muted, --color-accent and
+ | --color-accent-ink moved to theme.css, which redefines them warm. The five
+ | below stayed because the atelier table names no replacement for them, and
+ | inventing one would be a wider change than Phase 0 is allowed to make.
+ |
  | Contrast is a measured property of these numbers, not a matter of taste, so
  | the ratio each one has to clear is recorded next to it. Every value was
  | checked against WCAG 2.2 with the browser doing the oklch → sRGB conversion,
- | in both themes (PRD §31, handover 14's accessibility audit).
- |
- | The three light-theme values that changed in that audit are marked. They
- | were readable but not compliant: accent-coloured labels and the "Mission
- | complete" green sat between 3.3:1 and 4.2:1, which passes for large text and
- | fails for the 12-14px it is actually used at.
+ | in both themes (PRD §31, handover 14's accessibility audit). The ratios were
+ | measured against the previous --color-surface; the warm grounds in theme.css
+ | are within 1% of its luminance, so none of them moves a threshold.
  */
 @theme {
-  --color-surface: oklch(99% 0.003 265);
   --color-surface-raised: oklch(100% 0 0);
 
   /* Decorative separators only — cards, dividers, table rules. */
@@ -29,16 +31,11 @@
   /*
    | The boundary of an interactive control, where the border is the only thing
    | saying where the control begins. SC 1.4.11 asks 3:1 for that; this is
-   | 3.56:1 on the page and 3.65:1 on a raised surface.
+   | 3.56:1 on the page and 3.65:1 on a raised surface. --color-hairline-strong
+   | in theme.css is the warm equivalent that replaces it as the shell is
+   | restyled.
    */
   --color-border-strong: oklch(62% 0.02 265);
-
-  --color-ink: oklch(23% 0.02 265); /* 16.45:1 */
-  --color-ink-muted: oklch(52% 0.015 265); /* 5.36:1 */
-
-  /* Was 58%: label-on-button was 4.20:1. Now 4.94:1 there, 4.96:1 as text. */
-  --color-accent: oklch(54% 0.16 255);
-  --color-accent-ink: oklch(99% 0.005 255);
 
   --color-danger: oklch(56% 0.19 25); /* 5.00:1 */
 
@@ -46,34 +43,9 @@
   --color-success: oklch(52% 0.14 155);
 }
 
-/*
- | The dark palette already cleared every threshold in the audit — nothing here
- | moved except the addition of the control-boundary token, which the light
- | theme needed and both themes now have.
- */
-.dark {
-  --color-surface: oklch(19% 0.015 265);
-  --color-surface-raised: oklch(24% 0.018 265);
-  --color-border-subtle: oklch(32% 0.02 265);
-
-  /* 3.82:1 on the page, 3.41:1 on a raised surface. */
-  --color-border-strong: oklch(55% 0.02 265);
-
-  --color-ink: oklch(96% 0.006 265); /* 16.47:1 */
-  --color-ink-muted: oklch(72% 0.015 265); /* 7.46:1 */
-  --color-accent: oklch(72% 0.14 255); /* 7.44:1 as text, 7.57:1 under a label */
-  --color-accent-ink: oklch(18% 0.02 255);
-  --color-danger: oklch(70% 0.16 25); /* 6.46:1 */
-  --color-success: oklch(74% 0.13 155); /* 8.46:1 */
-}
-
 @layer base {
   html {
     color-scheme: light;
-  }
-
-  html.dark {
-    color-scheme: dark;
   }
 
   body {
