@@ -126,6 +126,16 @@ export interface HotspotLayerOptions {
   readonly reducedMotion?: boolean
   /** Invoked by the accessible structure list, which mirrors the markers. */
   readonly onIndexSelect?: (structure: StructureDto) => void
+  /**
+   * A structure index button gained or lost keyboard focus.
+   *
+   * Handover 17 requires every hover-reachable structure to stay
+   * keyboard-reachable "with the same highlight on focus". Focus is the
+   * keyboard's hover, so it is reported separately from selection — arrowing
+   * through the list must light structures up without selecting each one on
+   * the way past.
+   */
+  readonly onIndexFocus?: (structure: StructureDto | null) => void
 }
 
 export class HotspotLayer {
@@ -535,6 +545,8 @@ export class HotspotLayer {
       button.textContent = marker.structure.name
       button.setAttribute('aria-pressed', String(marker.structure.id === this.#selectedId))
       button.addEventListener('click', () => this.#options.onIndexSelect?.(marker.structure))
+      button.addEventListener('focus', () => this.#options.onIndexFocus?.(marker.structure))
+      button.addEventListener('blur', () => this.#options.onIndexFocus?.(null))
       item.append(button)
       list.append(item)
     }

@@ -97,7 +97,14 @@ const tools = computed<Tool[]>(() => [
     key: 'focus',
     icon: 'focus',
     caption: 'Focus',
-    hint: 'Fade the organ and the other markers, and fly the camera to this structure.',
+    // Two hints for two realities. On a per-structure organ the viewer really
+    // does hide the other structures and stops reporting `isolate` degraded, so
+    // the reduced wording would then be a lie in the other direction — and F15's
+    // rule is that a control says exactly what it does (handover 17).
+    hint:
+      props.degraded['isolate'] === undefined
+        ? 'Hide the other structures and fly the camera to this one.'
+        : 'Fade the organ and the other markers, and fly the camera to this structure.',
     capability: 'isolate',
     captionStatesReduction: true,
     pressed: props.isolated,
@@ -108,7 +115,10 @@ const tools = computed<Tool[]>(() => [
     key: 'wireframe',
     icon: 'grid',
     caption: 'Wireframe',
-    hint: 'Draws the mesh edges of the whole organ. Not superficial-to-deep anatomical layers.',
+    hint:
+      props.degraded['layers'] === undefined
+        ? 'Draws the mesh edges, tracing the boundary of every structure.'
+        : 'Draws the mesh edges of the whole organ. Not superficial-to-deep anatomical layers.',
     capability: 'layers',
     captionStatesReduction: true,
     pressed: props.layer === 'wireframe',

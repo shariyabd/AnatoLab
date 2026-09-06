@@ -64,6 +64,7 @@ import gsap from 'gsap'
 import { FIT_SIZE, MAX_CAMERA_DISTANCE_FACTOR } from './constants'
 import { AnatomyAssetManager, type LoadedOrganModel, type ModelLoader } from './AssetManager'
 import { HotspotLayer, type HotspotScreenPosition } from './HotspotLayer'
+import { StructureMeshes } from './StructureMeshes'
 import { TypedEmitter } from './emitter'
 import { disposeObject3D, disposeMaterial } from './dispose'
 import { probeWebGL, type WebGLProbe } from './webgl'
@@ -142,6 +143,26 @@ const CLICK_SLOP_PX = 6
 const CLICK_TIMEOUT_MS = 700
 
 /**
+ * Hover budget, handover 17 Branch C.
+ *
+ * A raycast per `pointermove` is a raycast per pixel of mouse travel, which is
+ * both wasted work and a way to mark the frame dirty continuously — that breaks
+ * render-on-demand, which is the property the whole viewer is built around
+ * (docs/project-context.md §2.4). ~60ms is under a frame at 16fps: fast enough
+ * that the chip feels attached to the cursor, slow enough that a sweep across
+ * the heart costs a handful of casts rather than hundreds.
+ */
+const HOVER_THROTTLE_MS = 60
+
+/**
+ * How long a cleared hover waits before it is believed.
+ *
+ * Sweeping between two adjacent structures passes through the gap between them,
+ * and without this the chip blinks out and back on every crossing.
+ */
+const HOVER_CLEAR_DEBOUNCE_MS = 120
+
+/**
  * Internal seams, supplied only by the test suite.
  *
  * The §5.2 signature is `constructor(container, options)` and stays that way —
@@ -183,6 +204,7 @@ export class AnatomyViewer {
   readonly #camera: PerspectiveCamera
   readonly #modelGroup = new Group()
   readonly #hotspots: HotspotLayer
+  readonly #structureMeshes = new StructureMeshes()
   readonly #assets: AnatomyAssetManager
   readonly #raycaster = new Raycaster()
   readonly #clipPlane = new Plane(new Vector3(-1, 0, 0), 0)
@@ -218,6 +240,11 @@ export class AnatomyViewer {
   #tweening = false
   #animationToken = 0
   #hoveredId: StructureId | null = null
+  #hoverChip: HTMLElement | null = null
+  #hoverAt = 0
+  #hoverTimer: ReturnType<typeof setTimeout> | null = null
+  #hoverClearTimer: ReturnType<typeof setTimeout> | null = null
+  #accentColor = '#d1584f'
   #pointerDown: { x: number; y: number; at: number } | null = null
   #resizeObserver: ResizeObserver | null = null
   #intersectionObserver: IntersectionObserver | null = null
@@ -237,6 +264,10 @@ export class AnatomyViewer {
     this.#hotspots = new HotspotLayer({
       reducedMotion: this.#reducedMotion,
       onIndexSelect: (structure) => this.#handleIndexSelect(structure),
+      // Focus is the keyboard's hover. Arrowing through the index lights each
+      // structure up without selecting it, which is the same treatment a mouse
+      // gets and the reason hover can stay an enhancement (handover 17).
+      onIndexFocus: (structure) => this.highlightStructure(structure?.id ?? null),
     })
 
     const probe = (deps.probeWebGL ?? probeWebGL)()
@@ -308,7 +339,18 @@ export class AnatomyViewer {
     // Hotspots snap against this organ's geometry, so they must be rebuilt for
     // every load — an anchor is only meaningful in the model it was authored
     // against (docs/architecture.md §5.4 rule 1).
+    // Two arguments, not three: handover 15 Phase 4 moved the marker colours
+    // into anatomy/palette.ts, so the layer no longer takes the organ's accent.
     this.#hotspots.attach(organ.structures, model.root)
+
+    // Per-structure geometry, when the export has it. Empty for a single-mesh
+    // organ, which is what makes every capability below fall back to dots with
+    // no branch of its own (handover 17).
+    this.#structureMeshes.attach(organ.structures, model.root)
+
+    // The hover tint still needs the accent — the markers no longer do.
+    this.#accentColor = organ.accentColor
+
     this.#selectedId = null
     this.#isolatedId = null
     this.#hotspots.setSolo(null)
@@ -378,9 +420,16 @@ export class AnatomyViewer {
    */
   highlightStructure(id: StructureId | null): void {
     if (this.#disposed) return
-    this.#hotspots.setHighlighted(
-      id === null ? null : (this.#hotspots.structureById(id)?.id ?? null),
-    )
+
+    const resolved = id === null ? null : (this.#hotspots.structureById(id)?.id ?? null)
+    this.#hotspots.setHighlighted(resolved)
+
+    // The same lift hover applies, so the keyboard path through the structure
+    // index reaches the identical treatment (handover 17: hover is an
+    // enhancement, never the only path). No chip: there is no cursor to pin it
+    // to, and the name is already on the focused button.
+    this.#structureMeshes.setHovered(resolved, this.#accentColor)
+
     this.#requestRender()
   }
 
@@ -396,13 +445,17 @@ export class AnatomyViewer {
   }
 
   /**
-   * Reduced semantics (docs/architecture.md §5.3).
+   * Isolate — real on a per-structure organ, reduced on a single mesh.
    *
-   * With single-mesh models there is no second object to hide, so this dims every
-   * other marker, fades the organ to 35 %, dims its contact shadow, and flies the
-   * camera in. It does **not** hide geometry, and says so through
-   * `capability:degraded`.
-   * With per-structure meshes it hides every other mesh instead.
+   * With per-structure geometry every other structure's mesh is hidden and the
+   * camera flies in. That is what this method always promised, and handover 17
+   * is where it becomes true; `capability:degraded` is not emitted, so the rail
+   * stops apologising for it.
+   *
+   * With a single mesh there is no second object to hide, so it does what it
+   * always did — dims every other marker, fades the organ to 35 %, dims the
+   * contact shadow — and still says so (docs/project-context.md §2.2). Both
+   * organs remain usable, which is handover 17 acceptance criterion 3.
    */
   isolateStructure(id: StructureId | null): void {
     if (this.#disposed || !this.#available) return
@@ -411,9 +464,23 @@ export class AnatomyViewer {
     this.#isolatedId = structure?.id ?? null
     this.#hotspots.setSolo(this.#isolatedId)
 
+    // Only when the target itself has geometry. Isolating a dot-only structure
+    // in a mixed-mode organ by hiding every mesh would leave an empty stage
+    // with one marker floating in it.
+    const canHideGeometry = this.#isolatedId !== null && this.#structureMeshes.has(this.#isolatedId)
+
     if (this.#isolatedId === null) {
+      this.#structureMeshes.setIsolated(null)
       this.#restoreMaterials()
       this.#setGroundOpacity(1)
+      this.#requestRender()
+      return
+    }
+
+    if (canHideGeometry) {
+      this.#structureMeshes.setIsolated(this.#isolatedId)
+      this.#setGroundOpacity(0.25)
+      this.focusStructure(this.#isolatedId)
       this.#requestRender()
       return
     }
@@ -424,9 +491,11 @@ export class AnatomyViewer {
 
     this.#emitter.emit('capability:degraded', {
       capability: 'isolate',
-      reason:
-        'This model is a single mesh with no per-structure geometry, so other structures ' +
-        'are dimmed rather than hidden (docs/project-context.md §2.2).',
+      reason: this.#structureMeshes.isPerStructure
+        ? 'This structure has no mesh of its own in the model, so the other structures are ' +
+          'dimmed rather than hidden.'
+        : 'This model is a single mesh with no per-structure geometry, so other structures ' +
+          'are dimmed rather than hidden (docs/project-context.md §2.2).',
     })
   }
 
@@ -489,7 +558,11 @@ export class AnatomyViewer {
     this.#layer = layer
     this.#applyLayerToMaterials()
 
-    if (layer === 'wireframe') {
+    // On a per-structure organ the wireframe traces the boundary of every
+    // structure, so it is showing anatomical subdivision rather than only the
+    // triangulation of one blob — which is the claim the caption makes. On a
+    // single mesh it still is not, and still says so.
+    if (layer === 'wireframe' && !this.#structureMeshes.isPerStructure) {
       this.#emitter.emit('capability:degraded', {
         capability: 'layers',
         reason:
@@ -708,6 +781,13 @@ export class AnatomyViewer {
     if (this.#rafId !== null) cancelAnimationFrame(this.#rafId)
     this.#rafId = null
 
+    // Both hover timers, before anything they touch is torn down. A trailing
+    // pick firing after disposal would raycast a scene that no longer exists.
+    if (this.#hoverTimer !== null) clearTimeout(this.#hoverTimer)
+    if (this.#hoverClearTimer !== null) clearTimeout(this.#hoverClearTimer)
+    this.#hoverTimer = null
+    this.#hoverClearTimer = null
+
     gsap.killTweensOf(this.#camera.position)
     if (this.#controls !== null) gsap.killTweensOf(this.#controls.target)
 
@@ -731,6 +811,14 @@ export class AnatomyViewer {
     this.#controls = null
 
     this.#hotspots.dispose()
+
+    // Restores the hovered mesh's own material and disposes the clone this
+    // viewer made. Everything else in the registry belongs to the model and is
+    // the asset manager's to free, below.
+    this.#structureMeshes.clear()
+
+    this.#hoverChip?.remove()
+    this.#hoverChip = null
 
     // Order matters: detach the model before disposing the manager, so the
     // manager frees geometry that is no longer referenced by a live scene graph.
@@ -1033,27 +1121,164 @@ export class AnatomyViewer {
     if (this.#mode === 'explore') this.selectStructure(structure.id)
   }
 
+  /**
+   * Hover, throttled.
+   *
+   * Every move used to pick immediately, which was affordable while picking
+   * meant a screen-space distance test against a handful of sprites. It is not
+   * affordable now that it can mean a mesh raycast, so moves are coalesced into
+   * one pick per HOVER_THROTTLE_MS with a trailing call, so the last position
+   * the pointer actually stopped at is always the one that gets resolved.
+   *
+   * There is no hover on touch. A coarse pointer's "move" is the beginning of a
+   * tap or a drag, and resolving it would show a chip under the finger that is
+   * about to select something.
+   */
   #handlePointerMove = (event: PointerEvent): void => {
     if (this.#mode === 'author' || this.#canvas === null) return
+    if (!this.#hoverEnabled()) return
 
     const pointer = this.#toCanvasPixels(event)
     if (pointer === null) return
 
+    const client = { x: event.clientX, y: event.clientY }
+    const elapsed = nowMs() - this.#hoverAt
+
+    if (elapsed >= HOVER_THROTTLE_MS) {
+      this.#resolveHover(pointer, client)
+      return
+    }
+
+    if (this.#hoverTimer !== null) clearTimeout(this.#hoverTimer)
+    this.#hoverTimer = setTimeout(
+      () => this.#resolveHover(pointer, client),
+      HOVER_THROTTLE_MS - elapsed,
+    )
+  }
+
+  #resolveHover(pointer: { x: number; y: number }, client: { x: number; y: number }): void {
+    if (this.#disposed || this.#canvas === null) return
+
+    this.#hoverAt = nowMs()
+    this.#hoverTimer = null
+
     const structure = this.#pickAt(pointer)
     const id = structure?.id ?? null
+
     this.#canvas.style.cursor = id === null ? 'grab' : 'pointer'
 
+    // Moving within the same structure still moves the chip. It follows the
+    // cursor, so leaving it pinned where the structure was first entered would
+    // read as a stuck tooltip.
+    if (id !== null) this.#positionHoverChip(client)
+
     if (id === this.#hoveredId) return
-    this.#hoveredId = id
-    this.#requestRender()
+
+    if (id === null) {
+      // Debounced out, not cleared: the gap between two adjacent structures is
+      // crossed in a frame or two, and clearing there flickers the chip.
+      this.#scheduleHoverClear()
+      return
+    }
+
+    this.#cancelHoverClear()
+    this.#applyHover(structure)
+  }
+
+  #applyHover(structure: StructureDto | null): void {
+    this.#hoveredId = structure?.id ?? null
+
+    const changed = this.#structureMeshes.setHovered(this.#hoveredId, this.#accentColor)
+    this.#showHoverChip(structure)
+
+    // One frame, then stop. `#requestRender` marks the frame dirty; it does not
+    // extend `busyUntil`, so the loop draws once and goes back to sleep. A
+    // hover that called `#keepAwake` would turn a mouse sweep into a
+    // continuous render (docs/architecture.md §15.1, idle frame cost ~0).
+    if (changed || structure !== null) this.#requestRender()
+
     this.#emitter.emit('structure:hovered', { structure })
+  }
+
+  #scheduleHoverClear(): void {
+    if (this.#hoverClearTimer !== null) return
+
+    this.#hoverClearTimer = setTimeout(() => {
+      this.#hoverClearTimer = null
+      if (this.#disposed || this.#hoveredId === null) return
+      this.#applyHover(null)
+    }, HOVER_CLEAR_DEBOUNCE_MS)
+  }
+
+  #cancelHoverClear(): void {
+    if (this.#hoverClearTimer === null) return
+    clearTimeout(this.#hoverClearTimer)
+    this.#hoverClearTimer = null
+  }
+
+  /**
+   * Fine pointers only, tested with `matchMedia` rather than a user-agent
+   * string. A hybrid laptop with a touchscreen reports `hover: hover` and gets
+   * the chip; a phone does not.
+   */
+  #hoverEnabled(): boolean {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true
+
+    return window.matchMedia('(hover: hover)').matches
+  }
+
+  /**
+   * The chip is the viewer's own DOM, positioned imperatively.
+   *
+   * Same rule as the callout, for the same reason: binding hover to a reactive
+   * ref would re-render the page on every pick, and a sweep across the heart
+   * would do it dozens of times. The host styles `.anatomy-viewer__hover-chip`;
+   * the viewer only ever sets its text and its transform.
+   */
+  #showHoverChip(structure: StructureDto | null): void {
+    if (structure === null) {
+      if (this.#hoverChip !== null) this.#hoverChip.hidden = true
+      return
+    }
+
+    if (this.#hoverChip === null) {
+      const chip = document.createElement('div')
+      chip.className = 'anatomy-viewer__hover-chip'
+      // Decorative: the name is already announced by the structure index, and
+      // a live region firing on every mouse move is noise, not access.
+      chip.setAttribute('aria-hidden', 'true')
+      this.#container.append(chip)
+      this.#hoverChip = chip
+    }
+
+    this.#hoverChip.textContent = structure.name
+    this.#hoverChip.hidden = false
+  }
+
+  #positionHoverChip(client: { x: number; y: number }): void {
+    const chip = this.#hoverChip
+    if (chip === null || chip.hidden) return
+
+    const bounds = this.#container.getBoundingClientRect()
+    chip.style.transform =
+      `translate3d(${Math.round(client.x - bounds.left)}px, ` +
+      `${Math.round(client.y - bounds.top)}px, 0)`
   }
 
   #handlePointerLeave = (): void => {
     this.#pointerDown = null
+
+    if (this.#hoverTimer !== null) {
+      clearTimeout(this.#hoverTimer)
+      this.#hoverTimer = null
+    }
+
+    this.#cancelHoverClear()
+
     if (this.#hoveredId === null) return
-    this.#hoveredId = null
-    this.#emitter.emit('structure:hovered', { structure: null })
+
+    // Leaving the canvas is unambiguous, so it is not debounced.
+    this.#applyHover(null)
   }
 
   #handleIndexSelect(structure: StructureDto): void {
@@ -1075,13 +1300,66 @@ export class AnatomyViewer {
     return { x: event.clientX - rect.left, y: event.clientY - rect.top }
   }
 
+  /**
+   * Which structure is under the pointer.
+   *
+   * Two mechanisms, in a deliberate order (handover 17 Branch C):
+   *
+   * 1. **The dot, when it belongs to a structure that has no mesh.** Handover
+   *    17 keeps `anchor_position` as the permanent fallback, and in a
+   *    mixed-mode organ a dot-only structure's marker may float over a
+   *    neighbour's geometry. Letting the raycast win there would make that
+   *    structure unselectable by the only affordance it has.
+   * 2. **A raycast against the structure meshes.** The wide target: anywhere on
+   *    the left ventricle, not within 24px of the dot pinned to it.
+   *
+   * A dot belonging to a mesh-backed structure falls through to the raycast,
+   * which resolves to the same structure — the dot is snapped to that
+   * structure's own surface — so the deliberate affordance keeps working
+   * without needing a special case.
+   */
   #pickAt(pointer: { x: number; y: number }): StructureDto | null {
     const canvas = this.#canvas
     if (canvas === null) return null
+
     this.#camera.updateMatrixWorld()
     const width = canvas.clientWidth || 1
     const height = canvas.clientHeight || 1
-    return this.#hotspots.pick(pointer.x, pointer.y, this.#camera, width, height)
+
+    const dot = this.#hotspots.pick(pointer.x, pointer.y, this.#camera, width, height)
+
+    if (dot !== null && !this.#structureMeshes.has(dot.id)) return dot
+
+    return this.#raycastStructure(pointer, width, height) ?? dot
+  }
+
+  /**
+   * Raycast against structure meshes only.
+   *
+   * The candidate list is the registry's own objects rather than the whole
+   * model, which is the cheap equivalent of a `Layers` mask: the plinth, the
+   * contact shadow and the marker sprites are never tested, because they were
+   * never handed in.
+   */
+  #raycastStructure(
+    pointer: { x: number; y: number },
+    width: number,
+    height: number,
+  ): StructureDto | null {
+    if (!this.#structureMeshes.isPerStructure) return null
+
+    const candidates = this.#structureMeshes.objects()
+    if (candidates.length === 0) return null
+
+    const ndc = new Vector2((pointer.x / width) * 2 - 1, -(pointer.y / height) * 2 + 1)
+    this.#raycaster.setFromCamera(ndc, this.#camera)
+
+    const hit = this.#raycaster.intersectObjects(candidates, true).at(0)
+    if (hit === undefined) return null
+
+    const id = this.#structureMeshes.resolve(hit.object)
+
+    return id === null ? null : this.#hotspots.structureById(id)
   }
 
   /**
