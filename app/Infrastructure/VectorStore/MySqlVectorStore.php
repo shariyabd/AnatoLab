@@ -90,6 +90,12 @@ final class MySqlVectorStore implements VectorStoreInterface
 
         $rows = $this->filtered($filters)->get();
 
+        // The query vector is the same on every iteration, so its magnitude is
+        // too. Computing it inside cosineSimilarity squared 1,536 floats once
+        // per surviving row — a third of the arithmetic, repeated a hundred
+        // times over on the corpus §8.1 sizes for.
+        $queryMagnitude = $this->magnitude($queryVector);
+
         $scored = [];
 
         foreach ($rows as $row) {
@@ -100,7 +106,11 @@ final class MySqlVectorStore implements VectorStoreInterface
             $scored[] = new RetrievedChunk(
                 id: $row->vectorId(),
                 content: $row->content,
-                score: $this->cosineSimilarity($queryVector, $row->embedding ?? []),
+                score: $this->cosineSimilarity(
+                    $queryVector,
+                    $row->embedding ?? [],
+                    magnitudeA: $queryMagnitude,
+                ),
                 sourceTitle: $this->sourceTitleFor($row),
                 metadata: $this->metadataFor($row),
             );
@@ -235,10 +245,29 @@ final class MySqlVectorStore implements VectorStoreInterface
     }
 
     /**
+     * Euclidean length of a vector.
+     *
+     * @param  list<float>  $vector
+     */
+    private function magnitude(array $vector): float
+    {
+        $total = 0.0;
+
+        foreach ($vector as $value) {
+            $total += $value ** 2;
+        }
+
+        return sqrt($total);
+    }
+
+    /**
      * @param  list<float>  $a
      * @param  list<float>  $b
+     * @param  float  $magnitudeA  `$a`'s Euclidean length, hoisted out of the
+     *                             caller's loop because `$a` is the query
+     *                             vector and does not change between chunks.
      */
-    private function cosineSimilarity(array $a, array $b): float
+    private function cosineSimilarity(array $a, array $b, float $magnitudeA): float
     {
         // Mismatched dimensions mean the corpus was embedded with a different
         // model than the query. Scoring it anyway would rank garbage highly, so
@@ -250,12 +279,10 @@ final class MySqlVectorStore implements VectorStoreInterface
         }
 
         $dot = 0.0;
-        $magnitudeA = 0.0;
         $magnitudeB = 0.0;
 
         foreach ($a as $index => $value) {
             $dot += $value * $b[$index];
-            $magnitudeA += $value ** 2;
             $magnitudeB += $b[$index] ** 2;
         }
 
@@ -263,6 +290,9 @@ final class MySqlVectorStore implements VectorStoreInterface
             return 0.0;
         }
 
-        return $dot / (sqrt($magnitudeA) * sqrt($magnitudeB));
+        // Identical arithmetic to sqrt($sumOfSquaresA) * sqrt($magnitudeB):
+        // $magnitudeA arrives already rooted, so the same two roots are
+        // multiplied and the scores are bit-for-bit what they were.
+        return $dot / ($magnitudeA * sqrt($magnitudeB));
     }
 }
