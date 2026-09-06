@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionLabel from '@/Components/Atelier/SectionLabel.vue'
 import type { StructureDto, StructureId } from '@/types/explore'
 
 /**
@@ -28,39 +29,53 @@ defineEmits<{
 </script>
 
 <template>
-  <ul class="space-y-0.5" aria-label="Structures in this organ">
-    <li v-for="structure in structures" :key="structure.id">
-      <button
-        type="button"
-        class="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-[var(--color-surface)]"
-        :class="
-          selectedId === structure.id
-            ? 'bg-[var(--color-surface)] font-semibold text-[var(--color-ink)]'
-            : 'text-[var(--color-ink-muted)]'
-        "
-        :aria-pressed="selectedId === structure.id"
-        @click="$emit('select', structure.id)"
-        @mouseenter="$emit('hover', structure.id)"
-        @mouseleave="$emit('hover', null)"
-        @focus="$emit('hover', structure.id)"
-        @blur="$emit('hover', null)"
-      >
-        <span
-          class="mt-1 size-2 shrink-0 rounded-full"
-          :style="{ backgroundColor: structure.markerColor ?? accentColor }"
-          aria-hidden="true"
-        />
-        <!--
-          Stacked rather than side by side: a TA term is often longer than the
-          English name, and sharing one line clips both.
-        -->
-        <span class="min-w-0 flex-1">
-          <span class="block truncate">{{ structure.name }}</span>
-          <span v-if="structure.taTerm" class="block truncate text-[0.6875rem] italic opacity-70">
-            {{ structure.taTerm }}
-          </span>
-        </span>
-      </button>
-    </li>
-  </ul>
+  <section
+    class="rounded-card bg-[var(--color-surface)] shadow-card"
+    aria-labelledby="structure-index-heading"
+  >
+    <header class="px-4 pb-2 pt-4">
+      <SectionLabel tag="h2" id="structure-index-heading">Structures</SectionLabel>
+    </header>
+
+    <div class="max-h-[min(22rem,calc(100vh-24rem))] overflow-y-auto px-2 pb-3">
+      <ul aria-label="Structures in this organ" class="space-y-0.5">
+        <li v-for="structure in structures" :key="structure.id">
+          <button
+            type="button"
+            class="flex w-full items-start gap-2.5 rounded-tile px-2 py-2 text-left transition-colors"
+            :class="
+              selectedId === structure.id
+                ? 'bg-[var(--color-accent-soft)] text-[var(--color-ink)]'
+                : 'text-[var(--color-ink-soft)] hover:bg-[var(--color-paper)]'
+            "
+            :aria-pressed="selectedId === structure.id"
+            @click="$emit('select', structure.id)"
+            @mouseenter="$emit('hover', structure.id)"
+            @mouseleave="$emit('hover', null)"
+            @focus="$emit('hover', structure.id)"
+            @blur="$emit('hover', null)"
+          >
+            <span
+              class="mt-[0.3rem] size-2 shrink-0 rounded-full"
+              :style="{ backgroundColor: structure.markerColor ?? accentColor }"
+              aria-hidden="true"
+            />
+            <!--
+              Stacked rather than side by side: a TA term is often longer than
+              the English name, and sharing one line clips both.
+            -->
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-ui">{{ structure.name }}</span>
+              <span
+                v-if="structure.taTerm"
+                class="block truncate font-body text-xs italic text-[var(--color-ink-muted)]"
+              >
+                {{ structure.taTerm }}
+              </span>
+            </span>
+          </button>
+        </li>
+      </ul>
+    </div>
+  </section>
 </template>

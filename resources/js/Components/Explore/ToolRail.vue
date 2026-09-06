@@ -1,206 +1,196 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import Icon from '@/Components/Atelier/Icon.vue'
 import type { ViewerLayer } from '@/types/explore'
 
 /**
- * Camera and rendering controls.
+ * The viewer tool rail — handover 05, rebuilt by handover 15 Phase 3.
  *
- * Every label here says what the control actually does, which is the whole
- * point of this component. The audited upstream shipped an "Isolate" that
- * faded the plinth, a "Layers" that meant wireframe, and a "Compare" that was
- * a 2D drawer (docs/project-context.md §2.5). Those three names are not
- * reproduced. Where the viewer reports reduced semantics through
- * `capability:degraded`, the reason it gives is rendered next to the control
- * rather than swallowed (docs/architecture.md §5.3).
+ * A floating vertical pill column over the canvas. Every caption says what the
+ * control actually does, which is the whole point of this component: the
+ * audited upstream shipped an "Isolate" that faded the plinth, a "Layers" that
+ * meant wireframe, and a "Compare" that was a 2D drawer
+ * (docs/project-context.md §2.5). None of those three names is reproduced, and
+ * Compare is not here at all.
  *
- * Surface / Wireframe / Cut through is one radio group rather than a
- * "Layers" toggle plus a separate "Cross-section" toggle, because
- * `setLayer('section')` *is* the cross-section — the viewer turns clipping on
- * and off as the layer changes. Two independent switches over one piece of
- * state would let the UI show a combination the viewer cannot be in.
+ * **Rotate and Pan are gestures, not buttons.** The handover's rail lists both.
+ * `OrbitControls` orbits on drag and pans on right-drag or two-finger drag —
+ * both work — but the viewer exposes no programmatic `pan()` or orbit command,
+ * and adding one is a change to the §5.2 interface that neither branch of this
+ * handover is allowed to make. A button wired to nothing is exactly the failure
+ * this component exists to prevent, so the two gestures are stated in the
+ * canvas tip note instead. See the delivery report.
  *
- * Pan is documented, not buttoned. `OrbitControls` pans on right-drag and
- * two-finger drag, but the viewer exposes no programmatic pan, and a button
- * wired to nothing is exactly the failure this component exists to avoid.
+ * **Wireframe and Cross-section are one piece of state wearing two buttons.**
+ * The viewer holds a single `layer`, and `setLayer('section')` *is* the
+ * cross-section. Each button toggles its own layer against `solid`, so turning
+ * one on turns the other off — which is the truth about the viewer, rather than
+ * two independent switches that could ask for a state it cannot be in.
+ *
+ * **Hidden, not disabled.** A control the viewer cannot honour is removed, not
+ * greyed out: Focus with nothing selected is gone until something is selected,
+ * and the whole rail disappears when there is no usable viewer under it.
+ *
+ * The same rule is applied to `capability:degraded`, with one qualification the
+ * handover does not make and docs/architecture.md §5.3 does. §5.3 defines the
+ * reduced semantics of `isolate`, `layers` and `crossSection` as the *contract*
+ * rather than as a fault, and the viewer emits `capability:degraded` on every
+ * successful use of all three. Hiding on that signal alone would empty the rail
+ * after one click. So a tool is removed when its capability is reported
+ * degraded and its caption does not already state the reduction; all three here
+ * do state it, so they stay and the viewer's explanation is surfaced as a note
+ * beside the canvas. See the delivery report.
  */
 const props = defineProps<{
   /** The viewer is unusable — WebGL missing, or the model never arrived. */
   disabled: boolean
-  autoRotate: boolean
   layer: ViewerLayer
   isolated: boolean
-  /** Isolate needs something to isolate. */
+  /** Focus needs something to focus on. */
   hasSelection: boolean
-  reducedMotion: boolean
   /** capability → the viewer's own explanation of what it did instead. */
   degraded: Readonly<Record<string, string>>
 }>()
 
 const emit = defineEmits<{
-  (event: 'update:autoRotate', value: boolean): void
   (event: 'update:layer', value: ViewerLayer): void
   (event: 'zoom', direction: 1 | -1): void
   (event: 'reset'): void
   (event: 'toggle-isolate'): void
 }>()
 
-const LAYERS: ReadonlyArray<{ value: ViewerLayer; label: string; hint: string }> = [
-  { value: 'solid', label: 'Surface', hint: 'The model as it is textured.' },
-  {
-    value: 'wireframe',
-    label: 'Wireframe',
-    hint: 'Draws the mesh edges of the whole organ. Not superficial-to-deep anatomical layers.',
-  },
-  {
-    value: 'section',
-    label: 'Cut through',
-    hint: 'One clipping plane across the whole organ, not a per-structure section.',
-  },
-]
+interface Tool {
+  readonly key: string
+  readonly icon: string
+  readonly caption: string
+  readonly hint: string
+  /** The viewer capability this control drives, where it has one. */
+  readonly capability?: 'isolate' | 'layers' | 'crossSection'
+  /**
+   * Whether `caption` already tells the truth about the reduced behaviour. A
+   * control that does is kept when the viewer reports it degraded; one that
+   * does not is removed rather than shown with an excuse attached.
+   */
+  readonly captionStatesReduction?: boolean
+  readonly pressed?: boolean
+  /** The viewer has nothing to apply this to right now. Removed, not disabled. */
+  readonly unavailable?: boolean
+  readonly run: () => void
+}
 
-/** Auto-rotate is refused outright under prefers-reduced-motion, by design. */
-const rotateDisabled = computed(() => props.disabled || props.reducedMotion)
+const tools = computed<Tool[]>(() => [
+  {
+    key: 'zoom-in',
+    icon: 'zoom-in',
+    caption: 'Zoom in',
+    hint: 'Move the camera closer.',
+    run: () => emit('zoom', 1),
+  },
+  {
+    key: 'zoom-out',
+    icon: 'zoom-out',
+    caption: 'Zoom out',
+    hint: 'Move the camera further away.',
+    run: () => emit('zoom', -1),
+  },
+  {
+    key: 'focus',
+    icon: 'focus',
+    caption: 'Focus',
+    hint: 'Fade the organ and the other markers, and fly the camera to this structure.',
+    capability: 'isolate',
+    captionStatesReduction: true,
+    pressed: props.isolated,
+    unavailable: !props.hasSelection,
+    run: () => emit('toggle-isolate'),
+  },
+  {
+    key: 'wireframe',
+    icon: 'grid',
+    caption: 'Wireframe',
+    hint: 'Draws the mesh edges of the whole organ. Not superficial-to-deep anatomical layers.',
+    capability: 'layers',
+    captionStatesReduction: true,
+    pressed: props.layer === 'wireframe',
+    run: () => emit('update:layer', props.layer === 'wireframe' ? 'solid' : 'wireframe'),
+  },
+  {
+    key: 'section',
+    icon: 'slice',
+    caption: 'Cross-section',
+    hint: 'One clipping plane across the whole organ, not a per-structure section.',
+    capability: 'crossSection',
+    captionStatesReduction: true,
+    pressed: props.layer === 'section',
+    run: () => emit('update:layer', props.layer === 'section' ? 'solid' : 'section'),
+  },
+  {
+    key: 'reset',
+    icon: 'reset',
+    caption: 'Reset',
+    hint: 'Return the camera to its starting framing.',
+    run: () => emit('reset'),
+  },
+])
+
+const visible = computed(() =>
+  tools.value.filter((tool) => {
+    if (tool.unavailable === true) return false
+    if (tool.capability === undefined) return true
+    if (props.degraded[tool.capability] === undefined) return true
+
+    return tool.captionStatesReduction === true
+  }),
+)
 
 const notes = computed(() => Object.values(props.degraded))
 </script>
 
 <template>
-  <div
-    class="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-2"
-    role="toolbar"
-    aria-label="Viewer controls"
-  >
-    <button
-      type="button"
-      class="tool"
-      :class="{ 'tool--on': autoRotate }"
-      :disabled="rotateDisabled"
-      :aria-pressed="autoRotate"
-      :title="
-        reducedMotion
-          ? 'Unavailable: your system is set to reduce motion.'
-          : 'Spin the model slowly on its vertical axis.'
-      "
-      @click="emit('update:autoRotate', !autoRotate)"
+  <div v-if="!disabled" class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+    <div
+      class="pointer-events-auto flex w-[4.5rem] flex-col gap-0.5 rounded-full bg-[var(--color-surface)] p-1.5 shadow-rail"
+      role="toolbar"
+      aria-label="Viewer controls"
+      aria-orientation="vertical"
     >
-      Auto-rotate
-    </button>
-
-    <div class="flex items-center gap-1" role="group" aria-label="Zoom">
       <button
+        v-for="tool in visible"
+        :key="tool.key"
         type="button"
-        class="tool"
-        :disabled="disabled"
-        title="Move the camera closer."
-        @click="emit('zoom', 1)"
+        class="flex flex-col items-center gap-1 rounded-full px-1 py-2 transition-colors"
+        :class="
+          tool.pressed === true
+            ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)]'
+            : 'text-[var(--color-ink-soft)] hover:bg-[var(--color-surface-sunk)] hover:text-[var(--color-ink)]'
+        "
+        :aria-pressed="tool.pressed === undefined ? undefined : tool.pressed"
+        :title="tool.hint"
+        @click="tool.run()"
       >
-        Zoom in
-      </button>
-      <button
-        type="button"
-        class="tool"
-        :disabled="disabled"
-        title="Move the camera further away."
-        @click="emit('zoom', -1)"
-      >
-        Zoom out
+        <Icon :name="tool.icon" class="size-5" />
+        <span class="text-[0.625rem] leading-[1.15] font-medium">{{ tool.caption }}</span>
       </button>
     </div>
-
-    <button
-      type="button"
-      class="tool"
-      :disabled="disabled"
-      title="Return the camera to its starting framing."
-      @click="emit('reset')"
-    >
-      Reset view
-    </button>
-
-    <button
-      type="button"
-      class="tool"
-      :class="{ 'tool--on': isolated }"
-      :disabled="disabled || !hasSelection"
-      :aria-pressed="isolated"
-      :title="
-        hasSelection
-          ? 'Fade the organ and the other markers, and fly the camera to this structure.'
-          : 'Select a structure first.'
-      "
-      @click="emit('toggle-isolate')"
-    >
-      {{ isolated ? 'Show everything' : 'Dim everything else' }}
-    </button>
-
-    <div class="flex items-center gap-1" role="radiogroup" aria-label="Rendering">
-      <button
-        v-for="option in LAYERS"
-        :key="option.value"
-        type="button"
-        class="tool"
-        :class="{ 'tool--on': layer === option.value }"
-        role="radio"
-        :aria-checked="layer === option.value"
-        :disabled="disabled"
-        :title="option.hint"
-        @click="emit('update:layer', option.value)"
-      >
-        {{ option.label }}
-      </button>
-    </div>
-
-    <p class="ml-auto text-xs text-[var(--color-ink-muted)]">
-      Drag to rotate &middot; scroll to zoom &middot; right-drag or two-finger drag to pan
-    </p>
-
-    <!--
-      The viewer's own account of what it did instead of what the label
-      promises. Polite rather than assertive: it appears as a consequence of
-      the student's click, so it must not interrupt them mid-sentence.
-    -->
-    <ul
-      v-if="notes.length > 0"
-      class="w-full list-none space-y-1 border-t border-[var(--color-border-subtle)] pt-2 text-xs text-[var(--color-ink-muted)]"
-      aria-live="polite"
-    >
-      <li v-for="note in notes" :key="note">{{ note }}</li>
-    </ul>
   </div>
+
+  <!--
+    The viewer's own account of what it did instead of what the caption
+    promises. Polite rather than assertive: it appears as a consequence of the
+    student's click, so it must not interrupt them mid-sentence. Outside the
+    rail because the rail is a fixed-width column and these are sentences.
+  -->
+  <ul
+    v-if="!disabled && notes.length > 0"
+    class="pointer-events-none absolute inset-x-3 bottom-3 z-10 list-none space-y-1 sm:left-24 sm:right-40"
+    aria-live="polite"
+  >
+    <li
+      v-for="note in notes"
+      :key="note"
+      class="pointer-events-auto rounded-tile bg-[var(--color-surface)] px-3 py-2 text-xs leading-snug text-[var(--color-ink-soft)] shadow-card"
+    >
+      {{ note }}
+    </li>
+  </ul>
 </template>
-
-<style scoped>
-/*
- | Plain CSS, not `@apply`: Tailwind 4 resolves utilities against the sheet
- | that imports it, and a Vue scoped block is compiled on its own — using
- | `@apply` here needs an `@reference` re-parse of the whole stylesheet per
- | component, which is a build-time cost for no styling benefit.
- */
-.tool {
-  border-radius: 0.375rem;
-  border: 1px solid var(--color-border-subtle);
-  padding: 0.375rem 0.625rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  font-weight: 500;
-  color: var(--color-ink);
-  transition:
-    color 150ms,
-    background-color 150ms,
-    border-color 150ms;
-}
-
-.tool:hover:not(:disabled) {
-  background-color: var(--color-surface);
-}
-
-.tool:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.tool--on {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-</style>

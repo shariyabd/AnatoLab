@@ -72,3 +72,36 @@ export interface StructureDetail extends StructureDto {
   }
   readonly relatedStructures?: readonly RelatedStructure[]
 }
+
+/**
+ * One row of the information panel's `KEY FACTS` block.
+ *
+ * `icon` is a name resolved by `Components/Atelier/Icon.vue`; an unknown name
+ * renders nothing rather than a broken glyph.
+ */
+export interface OrganKeyFact {
+  readonly icon: string
+  readonly label: string
+  readonly value: string
+}
+
+/**
+ * The editorial copy the information panel is built for — handover 15 Phase 5.
+ *
+ * **None of this exists in the database yet.** `organs` carries `name`,
+ * `scientific_name`, `description`, `accent_color`, the model columns and
+ * `status`, and nothing else. Handover 15 is not allowed to migrate a table
+ * F03 owns, so this is the typed shape the panel is written against: every
+ * section that reads it is `v-if`-guarded and simply does not render until the
+ * columns land and `OrganResource` carries them.
+ *
+ * The request to F03 is four columns on `organs` — `tagline` (string),
+ * `key_facts` (JSON array of the shape above), `medical_importance` (text) and
+ * `did_you_know` (text) — plus their keys on the resource.
+ */
+export interface OrganEditorial {
+  readonly tagline: string | null
+  readonly keyFacts: readonly OrganKeyFact[]
+  readonly medicalImportance: string | null
+  readonly didYouKnow: string | null
+}

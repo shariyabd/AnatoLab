@@ -56,9 +56,7 @@ function sendBackToDraft(question: AdminQuestion): void {
               <template v-if="question.organ"> · {{ question.organ.name }}</template>
             </p>
           </div>
-          <span
-            class="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300"
-          >
+          <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700">
             AI generated
           </span>
         </div>
@@ -71,11 +69,7 @@ function sendBackToDraft(question: AdminQuestion): void {
           <p class="text-xs font-medium text-[var(--color-ink-muted)]">Options</p>
           <ul class="mt-1 space-y-1 text-sm">
             <li v-for="option in question.options" :key="option.id" class="flex gap-2">
-              <span
-                :class="
-                  option.isCorrect ? 'font-medium text-emerald-600 dark:text-emerald-400' : ''
-                "
-              >
+              <span :class="option.isCorrect ? 'font-medium text-emerald-600' : ''">
                 {{ option.label }}. {{ option.value }}
                 <template v-if="option.isCorrect"> ✓ correct</template>
               </span>
@@ -83,10 +77,7 @@ function sendBackToDraft(question: AdminQuestion): void {
           </ul>
         </div>
 
-        <p
-          v-if="question.correctStructureName"
-          class="mt-3 text-sm text-emerald-600 dark:text-emerald-400"
-        >
+        <p v-if="question.correctStructureName" class="mt-3 text-sm text-emerald-600">
           Answer: {{ question.correctStructureName }}
         </p>
 

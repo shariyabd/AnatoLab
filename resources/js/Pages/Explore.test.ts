@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick, defineComponent } from 'vue'
+import { nextTick, defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import Explore from './Explore.vue'
 import { createOrgan, createStructure } from '@/anatomy/testing/fixtures'
@@ -22,6 +22,13 @@ const visit = vi.hoisted(() => vi.fn())
 
 vi.mock('@inertiajs/vue3', () => ({
   Head: defineComponent({ render: () => null }),
+  // The information panel's "View lessons" call to action is an Inertia link.
+  Link: defineComponent({
+    props: { href: { type: String, required: true } },
+    render(this: { href: string; $slots: { default?: () => unknown } }) {
+      return h('a', { href: this.href }, this.$slots.default?.() as never)
+    },
+  }),
   router: { visit },
 }))
 
@@ -177,17 +184,29 @@ describe('the text fallback', () => {
     wrapper.unmount()
   })
 
-  it('disables the camera tools it cannot honour rather than hiding the page', async () => {
+  it('takes the camera tools away rather than offering ones it cannot honour', async () => {
+    // Changed by handover 15 Phase 3, and deliberately: the rail used to sit
+    // below the canvas and grey itself out. It now floats *over* the canvas,
+    // which with no WebGL is an explanation of why there is no model — so a
+    // column of dead controls on top of that apology is chrome for something
+    // that is not there. Hidden, not disabled, is the rule the rail follows
+    // everywhere else too.
     const wrapper = mountPage()
+
+    // One tick: the rail reads `canInteract` off the stage through a template
+    // ref, which is null until the child has mounted.
+    await nextTick()
+    expect(wrapper.find('[role="toolbar"]').exists()).toBe(true)
 
     lastFakeViewer().emit('webgl:unavailable', { detail: 'No context.' })
     await nextTick()
 
-    const rail = wrapper.get('[role="toolbar"]')
+    expect(wrapper.find('[role="toolbar"]').exists()).toBe(false)
 
-    for (const button of rail.findAll('button')) {
-      expect(button.attributes('disabled')).toBeDefined()
-    }
+    // The page is not what was hidden: every structure is still a button.
+    expect(wrapper.get('ul[aria-label="Structures in this organ"]').findAll('button')).toHaveLength(
+      HEART.structures.length,
+    )
 
     wrapper.unmount()
   })
