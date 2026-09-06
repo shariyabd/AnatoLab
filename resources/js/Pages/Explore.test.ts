@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils'
 import Explore from './Explore.vue'
 import { createOrgan, createStructure } from '@/anatomy/testing/fixtures'
 import { fakeViewers, lastFakeViewer, resetFakeViewers } from '@/testing/fakeAnatomyViewer'
+import ViewerStage from '@/Components/Anatomy/ViewerStage.vue'
 import type { ExploreOrganCard } from '@/types/explore'
 
 /**
@@ -277,5 +278,99 @@ describe('the tutor seat', () => {
     expect(panel.text()).toContain('Asking about Aorta')
 
     wrapper.unmount()
+  })
+})
+
+/**
+ * Counts calls to a compiled SFC's render function.
+ *
+ * Handover 17 asks for this specifically — "spy the render function" — because
+ * the cheap version of the assertion (watch the DOM) cannot tell "did not
+ * re-render" from "re-rendered to the same output", and it is the re-rendering
+ * that costs, not the diff.
+ */
+function countRendersOf(component: unknown): { count: number; restore: () => void } {
+  const target = component as { render?: (...args: unknown[]) => unknown }
+  const original = target.render
+
+  if (original === undefined) {
+    throw new Error('The component has no render function to spy on.')
+  }
+
+  const state = {
+    count: 0,
+    restore: () => {
+      target.render = original
+    },
+  }
+
+  target.render = function (this: unknown, ...args: unknown[]): unknown {
+    state.count += 1
+    return original.apply(this, args)
+  }
+
+  return state
+}
+
+describe('hover costs nothing in Vue', () => {
+  /*
+   * Handover 17: "Zero Vue re-renders on hover — the same rule as the callout.
+   * If you bind hover state to a `ref`, a mouse sweep across the heart will
+   * re-render the page a hundred times."
+   *
+   * `useAnatomyViewer` does keep a `hoveredStructure` shallowRef, so the
+   * guarantee is not that nothing is written — it is that nothing *reads* it in
+   * a template. A ref with no render-effect subscriber schedules no update. That
+   * is easy to break by accident with a single `{{ hovered?.name }}`, and it
+   * would not fail any other test in this suite, which is why this one exists.
+   */
+  it('re-renders the page zero times across a hover sweep', async () => {
+    // Both components, because either could break it and they would fail
+    // differently: ViewerStage is where `useAnatomyViewer` lives and so where a
+    // hover binding would most naturally be added, and Explore is the page that
+    // would pay for it if the structure were passed upward.
+    const page = countRendersOf(Explore)
+    const stage = countRendersOf(ViewerStage)
+    const renders = {
+      get count(): number {
+        return page.count + stage.count
+      },
+      restore: (): void => {
+        page.restore()
+        stage.restore()
+      },
+    }
+
+    try {
+      const wrapper = mountPage()
+      await nextTick()
+
+      const baseline = renders.count
+      const viewer = lastFakeViewer()
+
+      // A sweep across the organ: the viewer throttles to ~60 ms, so even a
+      // slow drag emits a few dozen of these.
+      for (let sweep = 0; sweep < 40; sweep += 1) {
+        viewer.emit('structure:hovered', {
+          structure: HEART.structures[sweep % HEART.structures.length],
+        })
+      }
+      viewer.emit('structure:hovered', { structure: null })
+      await nextTick()
+
+      expect(renders.count).toBe(baseline)
+
+      // The counter is not asleep. Selecting *is* meant to re-render — the
+      // information panel and the structure list both show the selection — so
+      // this proves the assertion above could have failed.
+      viewer.emit('structure:selected', { structure: HEART.structures[1] })
+      await nextTick()
+
+      expect(renders.count).toBeGreaterThan(baseline)
+
+      wrapper.unmount()
+    } finally {
+      renders.restore()
+    }
   })
 })
