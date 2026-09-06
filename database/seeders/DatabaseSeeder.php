@@ -30,6 +30,11 @@ final class DatabaseSeeder extends Seeder
 
             AnatomySeeder::class,
             BodyTaxonomySeeder::class,
+
+            // Handover 17 Branch B. After the organs and their structures
+            // exist, and a no-op until a manifest row carries `structureNodes`.
+            MeshIdentitySeeder::class,
+
             LessonSeeder::class,
             AssessmentSeeder::class,
             MissionSeeder::class,
